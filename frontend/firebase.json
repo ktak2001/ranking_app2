@@ -1,0 +1,17 @@
+{
+  "hosting": {
+    "source": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "frameworksBackend": {
+      "region": "asia-east1"
+    },
+    "environment": {
+      "NEXT_PUBLIC_API_URL": "https://ranking-app-bf2df.an.r.appspot.com/api",
+      "NEXT_PUBLIC_WEB_URL": "https://ranking-app-bf2df.firebaseapp.com"
+    }
+  }
+}

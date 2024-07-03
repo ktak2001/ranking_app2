@@ -1,0 +1,41 @@
+# List of files and directories to be ignored by git
+
+# Frontend-specific ignores
+frontend/node_modules/
+frontend/.pnp/
+frontend/.pnp.js
+frontend/.yarn/install-state.gz
+frontend/coverage/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.DS_Store
+frontend/**/*.pem
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.env*.local
+frontend/.vercel
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+frontend/.firebase/
+
+# Ignore all .DS_Store files
+**/.DS_Store
+
+# Backend-specific ignores
+backend/.env
+backend/*.json
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/*.pyd
+backend/.DS_Store
+backend/npm-debug.log*
+backend/yarn-debug.log*
+backend/yarn-error.log*
+backend/.env*.local
+backend/.vercel
+backend/*.tsbuildinfo
+backend/next-env.d.ts

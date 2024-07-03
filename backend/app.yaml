@@ -1,0 +1,28 @@
+env: standard
+runtime: python310
+
+entrypoint: gunicorn -b :$PORT main:app
+# instance_class: F2
+
+env_variables:
+  WEB_URL: "https://ranking-app-bf2df.firebaseapp.com/"
+  FLASK_ENV: "production"
+  GOOGLE_CLOUD_PROJECT: "ranking-app-bf2df"
+  ADMIN_USERNAME: "kazuki_takehi"
+  ADMIN_PASSWORD: "a8f5f167f44f4964e6c998dee827110c"
+
+handlers:
+- url: /tasks/.*
+  script: auto
+  login: admin
+
+- url: /admin/.*
+  script: auto
+  secure: always
+
+- url: /.*
+  script: auto
+
+automatic_scaling:
+  max_instances: 2
+  min_instances: 0
