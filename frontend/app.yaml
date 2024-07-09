@@ -15,6 +15,7 @@ handlers:
 env_variables:
   NEXT_PUBLIC_API_URL: "https://ranking-app-bf2df.an.r.appspot.com/api"
   NEXT_PUBLIC_WEB_URL: "https://ranking-app-bf2df.an.r.appspot.com/"
+  NEXT_PUBLIC_API_KEY: "iuhashfkuashefasiufhoasuefoaeasoiflfeas"
 
 automatic_scaling:
   max_instances: 2

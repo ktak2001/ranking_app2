@@ -11,7 +11,16 @@ load_dotenv()
 # Get authentication info from environment variables
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+API_KEY = os.environ.get('API_KEY')
 API_URL = os.environ.get('API_URL', 'https://your-app-id.appspot.com')  # Set App Engine URL
+
+def send_request(endpoint, data):
+  headers = {
+      'X-API-KEY': API_KEY,
+      'Content-Type': 'application/json'
+  }
+  response = requests.post(f"{API_URL}/{endpoint}", headers=headers, json=data)
+  return response
 
 def send_manual_update_request(update_type):
   # Create Basic auth header
@@ -27,7 +36,7 @@ def send_manual_update_request(update_type):
   }
 
   # Send request
-  response = requests.post(f"{API_URL}/admin/manual_update", headers=headers, json=data)
+  response = send_request('admin/manual_update', data)
 
   # Process response
   if response.status_code == 200:
@@ -59,7 +68,7 @@ def set_youtuber_superchats():
   }
 
   # Send request
-  response = requests.post(f"{API_URL}/admin/set_youtuber_superchats", headers=headers, json=data)
+  response = send_request('admin/set_youtuber_superchats', data)
   logging.info(f"{API_URL}/admin/set_youtuber_superchats")
   logging.info("youtubers", youtubers)
 

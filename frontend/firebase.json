@@ -10,7 +10,7 @@
       "region": "asia-east1"
     },
     "environment": {
-      "NEXT_PUBLIC_API_URL": "https://ranking-app-bf2df.an.r.appspot.com/api",
+      "NEXT_PUBLIC_API_URL": "https://backend-io2redkura-an.a.run.app/api",
       "NEXT_PUBLIC_WEB_URL": "https://ranking-app-bf2df.firebaseapp.com"
     }
   }
