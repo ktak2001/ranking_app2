@@ -4,6 +4,7 @@ import csv
 from base64 import b64encode
 from dotenv import load_dotenv
 import logging
+import sys
 
 # Load environment variables from .env file
 load_dotenv()
@@ -47,7 +48,7 @@ def send_manual_update_request(update_type):
 def set_youtuber_superchats():
   # Read CSV file
   youtubers = []
-  with open('vtubers_info.csv', 'r', encoding='utf-8') as file:
+  with open('/ranking_app2/scripts/vtubers_info.csv', 'r', encoding='utf-8') as file:
     csv_reader = csv.DictReader(file)
     for row in csv_reader:
       youtubers.append({
@@ -79,14 +80,20 @@ def set_youtuber_superchats():
     print("Error in setting youtuber superchats:", response.status_code, response.text)
 
 if __name__ == "__main__":
-  action = input("Enter action (manual_update/set_superchats): ").strip().lower()
-  if action == 'manual_update':
-    update_type = input("Enter update type (currency/youtube): ").strip().lower()
-    if update_type in ['currency', 'youtube']:
-      send_manual_update_request(update_type)
+    if len(sys.argv) > 1:
+        action = sys.argv[1]
+        if action == 'set_superchats':
+            set_youtuber_superchats()
+        elif action == 'manual_update':
+            if len(sys.argv) > 2:
+                update_type = sys.argv[2]
+                if update_type in ['currency', 'youtube']:
+                    send_manual_update_request(update_type)
+                else:
+                    print("Invalid update type. Please enter 'currency' or 'youtube'.")
+            else:
+                print("Please specify update type (currency/youtube).")
+        else:
+            print("Invalid action. Please enter 'manual_update' or 'set_superchats'.")
     else:
-      print("Invalid update type. Please enter 'currency' or 'youtube'.")
-  elif action == 'set_superchats':
-    set_youtuber_superchats()
-  else:
-    print("Invalid action. Please enter 'manual_update' or 'set_superchats'.")
+        print("Please specify an action (manual_update/set_superchats).")

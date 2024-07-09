@@ -42,9 +42,6 @@ cd backend || exit 1
 pip3 install -r requirements.txt
 
 log "Running admin tasks script..."
-python3 ../scripts/admin_tasks_script.py <<EOF
-set_superchats
-EOF
+python3 ../scripts/admin_tasks_script.py set_superchats
 
-log "Task completed. Shutting down..."
-sudo shutdown -h now
+log "Task completed."
