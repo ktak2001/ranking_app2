@@ -3,29 +3,15 @@ from utils.youtube_api import YouTubeAPI
 from utils.common import pretty_json, getFilePath, read_from_json_file, write_into_file, get_currency_json, update_one_supporter
 from firebase_admin import firestore
 from flask import Blueprint, request, abort, jsonify
-from functools import wraps
 import requests
 import hashlib
 import hmac
 import logging
 from datetime import datetime, timedelta
-from google.cloud import pubsub_v1
 
 youtube_api = YouTubeAPI()
 tasks_blueprint = Blueprint('tasks', __name__)
 
-@tasks_blueprint.route('/admin/trigger_set_youtuber_superchats', methods=['POST'])
-def trigger_set_youtuber_superchats():
-    if not authenticate_admin(request):
-        abort(401)
-    
-    publisher = pubsub_v1.PublisherClient()
-    topic_path = publisher.topic_path(PROJECT_ID, 'set-youtuber-superchats-topic')
-    
-    data = 'trigger_set_youtuber_superchats'.encode('utf-8')
-    future = publisher.publish(topic_path, data)
-    
-    return jsonify({"message": "Task triggered", "task_id": future.result()})
 
 @tasks_blueprint.route('/tasks/update_currency', methods=['GET'])
 def update_currency():
