@@ -45,7 +45,9 @@ cd backend
 pip3 install -r requirements.txt
 
 log "Running admin tasks script..."
-log "Running admin tasks script..."
+export PYTHONPATH="/ranking_app2/backend:$PYTHONPATH"
+cd /ranking_app2/backend
 ENVIRONMENT=production GOOGLE_CLOUD_PROJECT=ranking-app-bf2df python3 ../scripts/set_youtubers.py 2>&1 | tee -a "$LOG_FILE"
 
 log "Task completed."
+sudo poweroff
