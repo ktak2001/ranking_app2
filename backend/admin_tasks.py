@@ -1,4 +1,4 @@
-from config import YOUTUBE_API_KEY, STRIPE_API_KEY, db, WEB_URL, ADMIN_USERNAME, ADMIN_PASSWORD, API_KEY
+from config import YOUTUBE_API_KEY, STRIPE_API_KEY, db, WEB_URL, ADMIN_USERNAME, ADMIN_PASSWORD, API_KEY, PROJECT_ID
 from utils.youtube_api import YouTubeAPI
 from utils.common import pretty_json, getFilePath, read_from_json_file, write_into_file, get_currency_json, update_one_supporter
 from firebase_admin import firestore
@@ -7,10 +7,25 @@ from functools import wraps
 import requests
 import hashlib
 import hmac
+import logging
 from datetime import datetime, timedelta
+from google.cloud import pubsub_v1
 
 youtube_api = YouTubeAPI()
 tasks_blueprint = Blueprint('tasks', __name__)
+
+@tasks_blueprint.route('/admin/trigger_set_youtuber_superchats', methods=['POST'])
+def trigger_set_youtuber_superchats():
+    if not authenticate_admin(request):
+        abort(401)
+    
+    publisher = pubsub_v1.PublisherClient()
+    topic_path = publisher.topic_path(PROJECT_ID, 'set-youtuber-superchats-topic')
+    
+    data = 'trigger_set_youtuber_superchats'.encode('utf-8')
+    future = publisher.publish(topic_path, data)
+    
+    return jsonify({"message": "Task triggered", "task_id": future.result()})
 
 @tasks_blueprint.route('/tasks/update_currency', methods=['GET'])
 def update_currency():
@@ -78,25 +93,37 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
         supporter['supporterCustomUrl'] = z['items'][0]['snippet']['customUrl']
         update_one_supporter(supporter, _year, _month, supporter['amount'], youtuber_id)
 
-@tasks_blueprint.route('/admin/set_youtuber_superchats', methods=['POST'])
-def set_youtuber_superChats():
-    data = request.get_json()
-    if not authenticate_admin(request):
-        abort(401)
-    youtubers = data['youtubers']
-    for youtuber in youtubers:
-        youtuber_id = youtuber['youtuberId']
-        youtuber_name = youtuber['youtuberName']
-        youtuber_info, video_ids = youtube_api.get_videos_until_date(youtuber_id, 2024, 3, 31)
-        all_vid_infos = youtube_api.process_videos(video_ids)
-        for vid in all_vid_infos:
-            if vid.get('liveStreamingDetails') == None or vid['snippet']['liveBroadcastContent'] == 'live' or vid['liveStreamingDetails'].get('actualEndTime') == None:
-                continue
-            print(f"Updating {youtuber_name}'s video: {vid['id']}")
-            update_for_each_video(youtuber_info, vid)
-    return {"success": True}
+# @tasks_blueprint.route('/admin/set_youtuber_superchats', methods=['POST'])
+def set_youtuber_superChats(youtubers):
+    try:
+        # data = request.get_json()
+        # if not authenticate_admin(request):
+        #     abort(401)
+        for youtuber in youtubers:
+            youtuber_id = youtuber['youtuberId']
+            youtuber_name = youtuber['youtuberName']
+            logging.info(f"Processing youtuber: {youtuber_name} ({youtuber_id})")
+            
+            youtuber_info, video_ids = youtube_api.get_videos_until_date(youtuber_id, 2024, 3, 31)
+            logging.info(f"Retrieved {len(video_ids)} videos for {youtuber_name}")
+            
+            for vid_id in video_ids:
+                try:
+                    vid_info = youtube_api.get_video_info(vid_id)
+                    if vid_info.get('liveStreamingDetails') is None or vid_info['snippet']['liveBroadcastContent'] == 'live' or vid_info['liveStreamingDetails'].get('actualEndTime') is None:
+                        continue
+                    logging.info(f"Updating {youtuber_name}'s video: {vid_id}")
+                    update_for_each_video(youtuber_info, vid_info)
+                except Exception as e:
+                    logging.error(f"Error processing video {vid_id}: {str(e)}")
+                    continue
+        
+        return {"success": True}
+    except Exception as e:
+        logging.error(f"Error in set_youtuber_superChats: {str(e)}")
+        return {"error": str(e)}
 
-@tasks_blueprint.route('/tasks/update_youtubers', methods=['GET'])
+# @tasks_blueprint.route('/tasks/update_youtubers', methods=['GET'])
 def update_youtubers():
     youtubers_docs = db.collection('youtubers').stream()
     for youtuber in youtubers_docs:

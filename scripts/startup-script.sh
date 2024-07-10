@@ -12,6 +12,8 @@ log() {
 }
 
 log "Starting startup script..."
+export ENVIRONMENT="production"
+export GOOGLE_CLOUD_PROJECT="ranking-app-bf2df"
 
 # システムの更新とツールのインストール
 log "Updating system and installing necessary tools..."
@@ -43,6 +45,6 @@ cd backend
 pip3 install -r requirements.txt
 
 log "Running admin tasks script..."
-python3 ../scripts/admin_tasks_script.py set_superchats
+ENVIRONMENT=production GOOGLE_CLOUD_PROJECT=ranking-app-bf2df python3 ../scripts/set_youtubers
 
 log "Task completed."

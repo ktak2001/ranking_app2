@@ -11,7 +11,9 @@ ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 WEB_URL = os.environ.get('WEB_URL')
 API_KEY = os.environ.get('API_KEY')
+ENVIRONMENT = os.environ.get('ENVIRONMENT', 'development')
 GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
+PROJECT_ID="ranking-app-bf2df"
 
 def access_secret_version(project_id, secret_id, version_id="latest"):
     try:
@@ -27,17 +29,19 @@ def access_secret_version(project_id, secret_id, version_id="latest"):
 if not GOOGLE_CLOUD_PROJECT:
     raise ValueError("GOOGLE_CLOUD_PROJECT environment variable is not set")
 
-YOUTUBE_API_KEY = access_secret_version(GOOGLE_CLOUD_PROJECT, "YOUTUBE_API_KEY")
-STRIPE_API_KEY = access_secret_version(GOOGLE_CLOUD_PROJECT, "STRIPE_API_KEY")
+if ENVIRONMENT == 'production':
+    YOUTUBE_API_KEY = access_secret_version(GOOGLE_CLOUD_PROJECT, "YOUTUBE_API_KEY")
+    STRIPE_API_KEY = access_secret_version(GOOGLE_CLOUD_PROJECT, "STRIPE_API_KEY")
+else:
+    YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY')
+    STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY')
 
 # Initialize Firebase Admin SDK
 def initialize_firebase():
-    if 'K_SERVICE' in os.environ:  # Check if running in Cloud Run
-        # Fetch Firebase credentials from Secret Manager
+    if ENVIRONMENT == 'production':
         firebase_creds_json = access_secret_version(GOOGLE_CLOUD_PROJECT, "FIREBASE_CREDENTIALS")
         cred = credentials.Certificate(json.loads(firebase_creds_json))
     else:
-        # Use local credentials file for development
         cred = credentials.Certificate(os.getenv('GOOGLE_APPLICATION_CREDENTIALS'))
     
     firebase_admin.initialize_app(cred)
