@@ -95,7 +95,7 @@ def set_youtuber_superChats(youtubers):
             
             for vid_id in video_ids:
                 try:
-                    vid_info = youtube_api.get_video_info(vid_id)
+                    vid_info = youtube_api.get_video_details(vid_id)
                     if vid_info.get('liveStreamingDetails') is None or vid_info['snippet']['liveBroadcastContent'] == 'live' or vid_info['liveStreamingDetails'].get('actualEndTime') is None:
                         continue
                     logging.info(f"Updating {youtuber_name}'s video: {vid_id}")
