@@ -45,6 +45,7 @@ cd backend
 pip3 install -r requirements.txt
 
 log "Running admin tasks script..."
-ENVIRONMENT=production GOOGLE_CLOUD_PROJECT=ranking-app-bf2df python3 ../scripts/set_youtubers
+log "Running admin tasks script..."
+ENVIRONMENT=production GOOGLE_CLOUD_PROJECT=ranking-app-bf2df python3 ../scripts/set_youtubers.py 2>&1 | tee -a "$LOG_FILE"
 
 log "Task completed."

@@ -3,6 +3,8 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from backend.admin_tasks import set_youtuber_superChats
 import logging
+import logging
+logging.basicConfig(filename='/tmp/startup-script.log', level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 import csv
 
@@ -26,3 +28,10 @@ def init():
         logger.error(f"Error reading CSV file: {str(e)}")
         return
     set_youtuber_superChats(youtubers)
+
+if __name__ == "__main__":
+    try:
+        init()
+        logger.info("Script completed successfully")
+    except Exception as e:
+        logger.exception(f"An error occurred: {str(e)}")

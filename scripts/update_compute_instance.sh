@@ -1,29 +1,12 @@
-#!/bin/bash
+gcloud compute instances add-metadata set-youtuber-superchats \
+--metadata-from-file startup-script=/Users/takehikazuki/Desktop/my_app3/ranking_app/scripts/startup-script.sh \
+--zone=asia-northeast1-a
 
-INSTANCE_NAME="set-youtuber-superchats"
-ZONE="asia-northeast1-a"
+gcloud compute instances stop set-youtuber-superchats --zone=asia-northeast1-a
+gcloud compute instances start set-youtuber-superchats --zone=asia-northeast1-a
 
-# インスタンスを起動
-gcloud compute instances start $INSTANCE_NAME --zone=$ZONE
+gcloud compute ssh set-youtuber-superchats --zone=asia-northeast1-a
 
-# インスタンスの起動を待つ
-while [[ $(gcloud compute instances describe $INSTANCE_NAME --zone=$ZONE --format='value(status)') != "RUNNING" ]]; do
-  sleep 5
-done
+sudo cat /var/log/syslog | grep startup-script
 
-# スタートアップスクリプトの完了を待つ
-gcloud compute ssh $INSTANCE_NAME --zone=$ZONE --command="tail -f /tmp/startup-script.log" &
-TAIL_PID=$!
-
-# "Task completed." が出力されるまで待つ
-while ! gcloud compute ssh $INSTANCE_NAME --zone=$ZONE --command="grep 'Task completed.' /tmp/startup-script.log"; do
-  sleep 10
-done
-
-# tail プロセスを終了
-kill $TAIL_PID
-
-# インスタンスを停止
-gcloud compute instances stop $INSTANCE_NAME --zone=$ZONE
-
-echo "Process completed and instance stopped."
+tail -f /tmp/startup-script.log
