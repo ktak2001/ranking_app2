@@ -86,7 +86,7 @@ class YouTubeAPI:
           "amount": jpn_msg,
           "supporterIconUrl": message['author']['images'][0]['url']
         }
-        logging.info(f"chat No.{i}: obj")
+        logging.info(f"chat No.{i}: {obj}")
         if supporter_id not in res:
           res[supporter_id] = obj
         else:
