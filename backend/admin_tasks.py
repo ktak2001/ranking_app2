@@ -85,7 +85,6 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, processing_y
     }, merge=True)
     logging.info(f"processing_supporter: {supporter}")
 
-
 @retry.Retry(predicate=retry.if_exception_type(requests.exceptions.RequestException))
 def get_channel_details(supporter_id):
     api_str = f"https://youtube.googleapis.com/youtube/v3/channels?part=contentDetails,snippet&id={supporter_id}&key={YOUTUBE_API_KEY}"
@@ -149,7 +148,7 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
     youtuber_ref.set({
         "videoIds": firestore.ArrayUnion([video_id])
     })
-    processing_youtubers_video_ref.delete()
+    # processing_youtubers_video_ref.delete()
 
 def set_youtuber_superChats(youtubers):
     try:
