@@ -1,14 +1,24 @@
 #!/bin/bash
 
-# エラーが発生したら即座に終了
-set -e
+# エラーが発生しても即座に終了しない
+set +e
 
 # ログファイルの設定
 LOG_FILE="/tmp/startup-script.log"
+BUCKET_NAME="set_youtubers_log"  # Cloud Storageバケット名を設定してください
 
 # ログ記録関数
 log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+    local message="$(date '+%Y-%m-%d %H:%M:%S') - $1"
+    echo "$message" | tee -a "$LOG_FILE"
+    # Cloud Loggingにも送信
+    logger -p user.info "$message"
+}
+
+upload_log() {
+    if [ -f "$LOG_FILE" ]; then
+        gsutil cp "$LOG_FILE" "gs://$BUCKET_NAME/logs/startup-script-$(date +%Y%m%d-%H%M%S).log"
+    fi
 }
 
 log "Starting startup script..."
@@ -26,6 +36,7 @@ export GITHUB_TOKEN=$(gcloud secrets versions access latest --secret="github-tok
 
 if [ -z "$GITHUB_TOKEN" ]; then
     log "Error: Failed to retrieve GitHub token from Secret Manager"
+    upload_log
     exit 1
 fi
 
@@ -49,5 +60,12 @@ export PYTHONPATH="/ranking_app2/backend:$PYTHONPATH"
 cd /ranking_app2/backend
 ENVIRONMENT=production GOOGLE_CLOUD_PROJECT=ranking-app-bf2df python3 ../scripts/set_youtubers.py 2>&1 | tee -a "$LOG_FILE"
 
-log "Task completed."
+if [ $? -ne 0 ]; then
+    log "Error occurred during task execution."
+    upload_log
+    exit 1
+fi
+
+log "Task completed successfully."
+upload_log
 sudo poweroff
