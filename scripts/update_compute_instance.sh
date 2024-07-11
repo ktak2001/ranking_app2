@@ -10,3 +10,5 @@ gcloud compute ssh set-youtuber-superchats --zone=asia-northeast1-a
 sudo cat /var/log/syslog | grep startup-script
 
 tail -f /tmp/startup-script.log
+
+sudo poweroff
