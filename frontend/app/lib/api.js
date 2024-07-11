@@ -20,13 +20,13 @@ export async function getSupporterInfo(supporterId) {
   return response.data;
 }
 
-export async function getSupporterMonthRanking(year, month, youtuberId) {
-  const response = await axiosInstance.post(`/getSupporterMonthRanking`, { year, month, youtuberId });
+export async function getSupportersRanking(year, month, youtuberId, showYear) {
+  const response = await axiosInstance.post(`/getSupportersRanking`, { year, month, youtuberId, showYear });
   return response.data;
 }
 
-export async function getYoutubersRanking(year, month) {
-  const response = await axiosInstance.post(`/getYoutubersRanking`, { year, month });
+export async function getYoutubersRanking(year, month, showYear) {
+  const response = await axiosInstance.post(`/getYoutubersRanking`, { year, month, showYear });
   return response.data;
 }
 

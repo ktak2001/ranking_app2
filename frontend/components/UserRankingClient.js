@@ -4,33 +4,33 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { showMoney } from "@/app/lib/useful.js";
 import Image from "next/image";
-import { getSupporterMonthRanking } from "@/app/lib/api.js";
+import { getSupportersRanking } from "@/app/lib/api.js";
 
 export default function UserRankingClient({ initialData, youtuberId, showYear, currentYear, selectedMonth }) {
   const [topSupporters, setTopSupporters] = useState(initialData.top_supporters)
-  const [totalMonthAmount, setTotalMonthAmount] = useState(initialData.total_month_amount)
+  const [totalAmount, setTotalAmount] = useState(initialData.total_amount)
   const [currentMonth, setCurrentMonth] = useState(selectedMonth)
 
   useEffect(() => {
-    console.log("currentMonth", currentMonth)
-    console.log("selectedMonth", selectedMonth)
+    // console.log("currentMonth", currentMonth)
+    console.log("showYear", showYear)
     if (currentMonth !== selectedMonth)  {
-      getSupporterMonthRanking(currentYear, selectedMonth, youtuberId)
+      getSupportersRanking(currentYear, selectedMonth, youtuberId, showYear)
         .then(data => {
           setTopSupporters(data.top_supporters)
-          setTotalMonthAmount(data.total_month_amount)
+          setTotalAmount(data.total_amount)
           setCurrentMonth(selectedMonth)
         })
         .catch(error => {
           console.error("error in userranking", error)
         })
     }
-  }, [youtuberId, selectedMonth])
+  }, [youtuberId, selectedMonth, showYear])
 
   return (
     <div>
       <div className="ms-3" >
-        <h3>{showMoney(totalMonthAmount)}</h3>
+        <h3>{showMoney(totalAmount)}</h3>
       </div>
       <table className="table table-hover table-striped">
         <thead>

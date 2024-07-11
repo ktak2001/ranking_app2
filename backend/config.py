@@ -14,6 +14,7 @@ API_KEY = os.environ.get('API_KEY')
 ENVIRONMENT = os.environ.get('ENVIRONMENT', 'development')
 GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
 PROJECT_ID="ranking-app-bf2df"
+IS_CLOUD_RUN = os.environ.get('K_SERVICE') is not None
 
 def access_secret_version(project_id, secret_id, version_id="latest"):
     try:

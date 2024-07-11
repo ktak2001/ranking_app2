@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import logging
 from datetime import datetime, timedelta
+from google.api_core import retry
 
 youtube_api = YouTubeAPI()
 tasks_blueprint = Blueprint('tasks', __name__)
@@ -37,6 +38,60 @@ def update_for_each_video(youtuber_info, video):
         video_info['video_total_earning'] = video_total_earning
         update_doc(youtuber_info, video_info, all_supporters_info)
 
+def update_supporter(supporter, _year, _month, amount, youtuber_id, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing):
+    supporter_name, supporter_id, supporter_icon_url, supporter_custom_url = (
+        supporter[k] for k in ('supporterName', 'supporterId', 'supporterIconUrl', 'supporterCustomUrl')
+    )
+    new_amount = firestore.Increment(amount)
+    youtuber_supporter_ref = db.collection('youtubers').document(youtuber_id).collection('supporters').document(supporter_id)
+    if is_processing and supporter_id in processing_youtubers_video_data.get("youtuberSupporterRef", []):
+        return
+    youtuber_supporter_ref.set({
+        "supporterName": supporter_name,
+        "supporterId": supporter_id,
+        "supporterIconUrl": supporter_icon_url,
+        "supporterCustomUrl": supporter_custom_url,
+        "totalAmount": new_amount,
+        "monthlyAmount": {
+            _year + _month: new_amount
+        },
+        "yearlyAmount": {
+            _year: new_amount
+        },
+    }, merge=True)
+    processing_youtubers_video_ref.set({
+        "youtuberSupporterRef": firestore.ArrayUnion([supporter_id])
+    }, merge=True)
+    supporter_ref = db.collection("supporters").document(supporter_id)
+    supporter_doc = supporter_ref.get()
+    if is_processing and supporter_id in processing_youtubers_video_data.get("supporterRef", []):
+        return
+    if not supporter_doc.exists:
+        supporter_ref.set({
+            "supporterName": supporter_name,
+            "supporterId": supporter_id,
+            "connectedUser": None,
+            "supporterIconUrl": supporter_icon_url,
+            "supporterCustomUrl": supporter_custom_url,
+        })
+    supporter_ref.set({
+        "supportedYoutubers": {
+            _year: firestore.ArrayUnion([youtuber_id]),
+            _year + _month: firestore.ArrayUnion([youtuber_id]),
+        },
+    }, merge=True)
+    processing_youtubers_video_ref.set({
+        "supporterRef": firestore.ArrayUnion([supporter_id])
+    }, merge=True)
+
+
+@retry.Retry(predicate=retry.if_exception_type(requests.exceptions.RequestException))
+def get_channel_details(supporter_id):
+    api_str = f"https://youtube.googleapis.com/youtube/v3/channels?part=contentDetails,snippet&id={supporter_id}&key={YOUTUBE_API_KEY}"
+    response = requests.get(api_str)
+    response.raise_for_status()
+    return response.json()
+
 def update_doc(youtuber_info, video_info, all_supporters_info):
     youtuber_id, youtuber_name, youtuber_icon_url, youtuber_custom_url = (
         youtuber_info[k] for k in ('youtuber_id', 'youtuber_name', 'youtuber_icon_url', 'youtuber_custom_url')
@@ -46,45 +101,55 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
     _month = video_info['_month']
     video_total_earning = video_info['video_total_earning']
 
+    processing_youtubers_video_ref = db.collection("processing_youtubers").document(youtuber_id).collection("videos").document(video_id)
+    processing_youtubers_video_doc = processing_youtubers_video_ref.get()
+    is_processing = processing_youtubers_video_doc.exists
+    processing_youtubers_video_data = processing_youtubers_video_doc.to_dict() if is_processing else {}
     youtuber_ref = db.collection("youtubers").document(youtuber_id)
     youtuber_doc = youtuber_ref.get()
     if not youtuber_doc.exists:
         youtuber_ref.set({
             "youtuberName": youtuber_name,
-            "totalAmount": video_total_earning,
+            "totalAmount": 0,
             "youtuberId": youtuber_id,
-            "videoIds": [video_id],
+            "videoIds": [],
             "youtuberIconUrl": youtuber_icon_url,
             "youtuberCustomUrl": youtuber_custom_url
         })
-    elif video_id in youtuber_doc.to_dict().get('videoIds', []):
-        print("already took the chats for this videoId", video_id)
-        return
-    else:
+    if not is_processing:
         youtuber_ref.set({
-            "videoIds": firestore.ArrayUnion([video_id]),
             "totalAmount": firestore.Increment(video_total_earning)
         }, merge=True)
-    youtuber_summary_year_ref = youtuber_ref.collection("summary").document(_year)
-    youtuber_summary_year_ref.set({
-        "totalAmount": firestore.Increment(video_total_earning),
-        "monthlyAmount": {
-            _month: firestore.Increment(video_total_earning)
-        }
-    }, merge=True)
-    for _, supporter in all_supporters_info.items():
-        api_str = "https://youtube.googleapis.com/youtube/v3/channels?part=contentDetails,snippet&id={0}&key={1}"
-        deet = api_str.format(supporter['supporterId'], YOUTUBE_API_KEY)
-        z = requests.get(deet).json()
-        supporter['supporterCustomUrl'] = z['items'][0]['snippet']['customUrl']
-        update_one_supporter(supporter, _year, _month, supporter['amount'], youtuber_id)
+        processing_youtubers_video_ref.set({
+            "summary": False,
+            "youtuberSupporterRef": [],
+            "supporterRef": []
+        })
+    if not is_processing or not processing_youtubers_video_data.get("summary", False):
+        youtuber_summary_year_ref = youtuber_ref.collection("summary").document(_year)
+        youtuber_summary_year_ref.set({
+            "totalAmount": firestore.Increment(video_total_earning),
+            "monthlyAmount": {
+                _month: firestore.Increment(video_total_earning)
+            }
+        }, merge=True)
+        processing_youtubers_video_ref.set({
+            "summary": True
+        }, merge=True)
+    supporter_ids = [supporter['supporterId'] for supporter in all_supporters_info.values()]
+    channel_details = {supporter_id: get_channel_details(supporter_id) for supporter_id in set(supporter_ids)}
 
-# @tasks_blueprint.route('/admin/set_youtuber_superchats', methods=['POST'])
+    for _, supporter in all_supporters_info.items():
+        supporter['supporterCustomUrl'] = channel_details[supporter['supporterId']]['items'][0]['snippet']['customUrl']
+        update_supporter(supporter, _year, _month, supporter['amount'], youtuber_id, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing)
+    
+    youtuber_ref.set({
+        "videoIds": firestore.ArrayUnion([video_id])
+    })
+    processing_youtubers_video_ref.delete()
+
 def set_youtuber_superChats(youtubers):
     try:
-        # data = request.get_json()
-        # if not authenticate_admin(request):
-        #     abort(401)
         for youtuber in youtubers:
             youtuber_id = youtuber['youtuberId']
             youtuber_name = youtuber['youtuberName']
@@ -94,15 +159,11 @@ def set_youtuber_superChats(youtubers):
             logging.info(f"Retrieved {len(video_ids)} videos for {youtuber_name}")
             
             for vid_id in video_ids:
-                try:
-                    vid_info = youtube_api.get_video_details(vid_id)
-                    if vid_info.get('liveStreamingDetails') is None or vid_info['snippet']['liveBroadcastContent'] == 'live' or vid_info['liveStreamingDetails'].get('actualEndTime') is None:
-                        continue
-                    logging.info(f"Updating {youtuber_name}'s video: {vid_id}")
-                    update_for_each_video(youtuber_info, vid_info)
-                except Exception as e:
-                    logging.error(f"Error processing video {vid_id}: {str(e)}")
+                vid_info = youtube_api.get_video_details(vid_id)
+                if vid_info.get('liveStreamingDetails') is None or vid_info['snippet']['liveBroadcastContent'] == 'live' or vid_info['liveStreamingDetails'].get('actualEndTime') is None:
                     continue
+                logging.info(f"Updating {youtuber_name}'s video: {vid_id}")
+                update_for_each_video(youtuber_info, vid_info)
         
         return {"success": True}
     except Exception as e:
@@ -147,3 +208,4 @@ def authenticate_admin(request):
     expected_hash = hashlib.sha256(ADMIN_PASSWORD.encode('utf-8')).hexdigest()
 
     return hmac.compare_digest(password_hash, expected_hash)
+

@@ -10,6 +10,6 @@ export const dynamic = 'force-dynamic';
 
 export default async function Home() {
   const {year, month} = yearMonth()
-  const initialYoutubers = await getYoutubersRanking(year, month)
+  const initialYoutubers = await getYoutubersRanking(year, month, false)
   return <ClientHome initialYoutubers={initialYoutubers} year={year} month={month} />
 }

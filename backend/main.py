@@ -1,4 +1,4 @@
-from config import YOUTUBE_API_KEY, STRIPE_API_KEY, db, WEB_URL, API_KEY
+from config import YOUTUBE_API_KEY, STRIPE_API_KEY, db, WEB_URL, API_KEY, IS_CLOUD_RUN
 from utils.common import pretty_json, getFilePath, read_from_json_file, write_into_file, get_currency_json, update_one_supporter
 import numpy as np
 import pandas as pd
@@ -10,38 +10,108 @@ from flask import Flask, request, jsonify, abort, redirect
 from flask_cors import CORS
 import os
 import stripe
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from admin_tasks import tasks_blueprint
+import functools
+import time
+import threading
 
 app = Flask(__name__)
 CORS(app)
 app.register_blueprint(tasks_blueprint)
 stripe.api_key = STRIPE_API_KEY
 
+if IS_CLOUD_RUN:
+    cache = {}
+    cache_lock = threading.Lock()
+else:
+    cache = None
+    cache_lock = None
+
+
+def cache_with_persistence(ttl_minutes=30):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            cache_key = f"{func.__name__}:{args}:{kwargs}"
+            
+            if not IS_CLOUD_RUN:
+                # Cloud Run以外の環境では、キャッシュを使用せずに直接関数を実行
+                return func(*args, **kwargs)
+            
+            with cache_lock:
+                if cache_key in cache:
+                    result, timestamp = cache[cache_key]
+                    if datetime.now() - timestamp < timedelta(minutes=ttl_minutes):
+                        return result
+            
+            doc_ref = db.collection('cache').document(cache_key)
+            doc = doc_ref.get()
+            
+            if doc.exists:
+                cached_data = doc.to_dict()
+                if datetime.now() - cached_data['timestamp'].replace(tzinfo=None) < timedelta(minutes=ttl_minutes):
+                    with cache_lock:
+                        cache[cache_key] = (cached_data['result'], cached_data['timestamp'])
+                    return cached_data['result']
+            
+            result = func(*args, **kwargs)
+            
+            with cache_lock:
+                cache[cache_key] = (result, datetime.now())
+            
+            doc_ref.set({
+                'result': result,
+                'timestamp': datetime.now()
+            })
+            
+            return result
+        return wrapper
+    return decorator
+
+def persist_cache():
+    while True:
+        time.sleep(3600)  # 1時間ごとに永続化
+        if not IS_CLOUD_RUN:
+            return  # Cloud Run以外の環境では永続化を行わない
+        
+        with cache_lock:
+            for key, (value, timestamp) in cache.items():
+                if datetime.now() - timestamp < timedelta(minutes=30):
+                    db.collection('cache').document(key).set({
+                        'result': value,
+                        'timestamp': timestamp
+                    })
+                else:
+                    del cache[key]
+
+if IS_CLOUD_RUN:
+    threading.Thread(target=persist_cache, daemon=True).start()
+
 @app.route("/api/app_engine")
 def test_app_engine():
     return jsonify({"message": True})
 
-@app.route("/api/youtubers")
-def get_youtubers():
-    youtubers_docs = db.collection('youtubers').stream()
-    youtubers_list = []
-    for youtuber_doc in youtubers_docs:
-        youtuber = youtuber_doc.to_dict()
-        youtubers_list.append({
-            "amount": youtuber['totalAmount'],
-            "youtuberName": youtuber['youtuberName'],
-            "youtuberId": youtuber['youtuberId'],
-            "youtuberIconUrl": youtuber['youtuberIconUrl']
-        })
-    logging.info(f"youtubers: {youtubers_list}")
-    return jsonify(youtubers_list)
+# @cache_firestore()
+# def get_youtubers():
+#     youtubers_docs = db.collection('youtubers').stream()
+#     youtubers_list = []
+#     for youtuber_doc in youtubers_docs:
+#         youtuber = youtuber_doc.to_dict()
+#         youtubers_list.append({
+#             "amount": youtuber['totalAmount'],
+#             "youtuberName": youtuber['youtuberName'],
+#             "youtuberId": youtuber['youtuberId'],
+#             "youtuberIconUrl": youtuber['youtuberIconUrl']
+#         })
+#     logging.info(f"youtubers: {youtubers_list}")
+#     return jsonify(youtubers_list)
 
-@app.route("/api/test/version5")
-def test_ver5():
-    get_supporter_detail("UCZf__ehlCEBPop-_sldpBUQ")
-    return {"success": True}
+# @app.route("/api/youtubers")
+# def getYoutubers():
+#     return get_youtubers()
+
 
 def get_supporter_detail(supporter_id):
     api_str = "https://youtube.googleapis.com/youtube/v3/channels?part=snippet&id={0}&key={1}"
@@ -80,27 +150,35 @@ def connect_user_to_supporter():
     return supporter_info
 
 @app.route("/api/getYoutubersRanking", methods=["POST"])
-def get_youtubers_ranking():
+def getYoutubersRanking():
     data = request.get_json()
+    showYear = data['showYear']
     year = '_' + data['year']
     month = '_' + data['month']
+    return get_youtubers_ranking(year, month, showYear)
+
+@cache_with_persistence()
+def get_youtubers_ranking(year, month, showYear):
     youtubers_docs = db.collection('youtubers').stream()
     ranking_list = []
-    
+    print(f"showYear: {showYear}")
+
     for youtuber_doc in youtubers_docs:
         youtuber = youtuber_doc.to_dict()
-        youtuber_monthly_doc = db.collection('youtubers').document(youtuber_doc.id).collection('summary').document(year).get()
+        youtuber_doc = db.collection('youtubers').document(youtuber_doc.id).collection('summary').document(year).get()
         
-        if not youtuber_monthly_doc.exists:
+        if not youtuber_doc.exists:
             continue
+        if showYear:
+          amount = (youtuber_doc.to_dict()).get('totalAmount', 0)
+        else:
+          amount = (youtuber_doc.to_dict()).get('monthlyAmount', {}).get(month, 0)
         
-        monthly_amount = (youtuber_monthly_doc.to_dict()).get('monthlyAmount', {}).get(month, 0)
-        
-        if monthly_amount == 0:
+        if amount == 0:
             continue
         
         ranking_list.append({
-            "amount": monthly_amount,
+            "amount": amount,
             "youtuberName": youtuber['youtuberName'],
             "youtuberId": youtuber['youtuberId'],
             "youtuberIconUrl": youtuber['youtuberIconUrl']
@@ -109,45 +187,52 @@ def get_youtubers_ranking():
     sorted_ranking = sorted(ranking_list, key=lambda x: x['amount'], reverse=True)
     return sorted_ranking
 
-@app.route("/api/getSupporterMonthRanking", methods=["POST"])
-def get_supporter_month_ranking():
+@app.route("/api/getSupportersRanking", methods=["POST"])
+def getSupporterRanking():
     data = request.get_json()
-    year = '_' + data['year']
-    month = '_' + data['month']
-    youtuber_id = data['youtuberId']
+    _year = '_'+ data['year']
+    _month = '_'+ data['month']
+    youtuberId = data['youtuberId']
+    showYear = data['showYear']
+    return get_supporters_ranking(_year, _month, youtuberId, showYear)
 
-    logging.info("data", data)
-    logging.info("channelId", youtuber_id)
-
-    youtuber_ref = db.collection('youtubers').document(youtuber_id)
-    youtuber_name = (youtuber_ref.get().to_dict())['youtuberName']
-    total_month_amount = (youtuber_ref.collection('summary').document(year).get().to_dict()).get('monthlyAmount', {}).get(month, 0)
-    youtuber_supporter_list = youtuber_ref.collection('supporters').order_by(f"monthlyAmount.{year}{month}", direction=firestore.Query.DESCENDING).limit(30).stream()
-    top_supporters = []
-    
-    for supporter in youtuber_supporter_list:
-        supporter_data = supporter.to_dict()
-        monthly_amount = supporter_data.get('monthlyAmount', {})
-        amount = monthly_amount.get(year + month, 0)
-        top_supporters.append({
-            'supporterName': supporter_data['supporterName'],
-            'supporterId': supporter.id,
-            'amount': amount,
-            "supporterIconUrl": supporter_data['supporterIconUrl'],
-            'supporterCustomUrl': supporter_data.get('supporterCustomUrl', "")
-        })
-    
-    return {
-        "total_month_amount": total_month_amount,
-        "top_supporters": top_supporters,
-        'youtuberName': youtuber_name
-    }
+@cache_with_persistence()
+def get_supporters_ranking(_year, _month, youtuberId, showYear):
+  youtuber_ref = db.collection('youtubers').document(youtuberId)
+  youtuberName = (youtuber_ref.get().to_dict())['youtuberName']
+  if showYear:
+    total_amount = (youtuber_ref.collection('summary').document(_year).get().to_dict()).get('totalAmount', 0)
+    youtuber_supporter_list = youtuber_ref.collection('supporters').order_by(f"yearlyAmount.{_year}", direction=firestore.Query.DESCENDING).limit(30).stream()
+  else:
+    total_amount = (youtuber_ref.collection('summary').document(_year).get().to_dict()).get('monthlyAmount', {}).get(_month, 0)
+    youtuber_supporter_list = youtuber_ref.collection('supporters').order_by(f"monthlyAmount.{_year}{_month}", direction=firestore.Query.DESCENDING).limit(30).stream()
+  top_supporters = []
+  for supporter in youtuber_supporter_list:
+    supporter_data = supporter.to_dict()
+    if showYear:
+      amount = supporter_data.get('yearlyAmount', {}).get(_year, 0)
+    else:
+      amount = supporter_data.get('monthlyAmount', {}).get(_year+_month, 0)
+    top_supporters.append({
+      'supporterName': supporter_data['supporterName'],
+      'supporterId': supporter.id,
+      'amount': amount,
+      "supporterIconUrl": supporter_data['supporterIconUrl']
+    })
+  return {
+    "total_amount": total_amount,
+    "top_supporters": top_supporters,
+    'youtuberName': youtuberName
+  }
 
 @app.route("/api/getYoutuberInfo", methods=["POST"])
-def get_youtuber_info():
+def getYoutuberInfo():
     data = request.get_json()
-    logging.info(f"request in getYoutuberInfo: {pretty_json(data)}")
     youtuber_id = data['youtuberId']
+    return get_youtuber_info(youtuber_id)
+
+@cache_with_persistence()
+def get_youtuber_info(youtuber_id):
     youtuber_doc = db.collection('youtubers').document(youtuber_id).get()
     
     if not youtuber_doc.exists:
@@ -168,9 +253,13 @@ def get_youtuber_info():
     }
 
 @app.route("/api/getSupporterInfo", methods=["POST"])
-def get_supporter_info():
+def getSupporterInfo():
     data = request.get_json()
     supporter_id = data['supporterId']
+    return get_supporter_info(supporter_id)
+
+@cache_with_persistence()
+def get_supporter_info(supporter_id):
     supporters_ref = db.collection('supporters').document(supporter_id)
     
     if not supporters_ref.get().exists:
@@ -188,12 +277,16 @@ def get_supporter_info():
     }
 
 @app.route("/api/getSupportingYoutubers", methods=["POST"])
-def get_supporting_youtubers():
+def getSupportingYoutubers():
     data = request.get_json()
     print("request in getSupporterInfo", pretty_json(data))
     supporter_id = data['supporterId']
     year = '_' + data['year']
     month = '_' + data['month']
+    return get_supporting_youtubers(supporter_id, year, month)
+
+@cache_with_persistence()
+def get_supporting_youtubers(supporter_id, year, month):
     supporters_ref = db.collection('supporters').document(supporter_id)
     
     if not supporters_ref.get().exists:

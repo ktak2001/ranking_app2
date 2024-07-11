@@ -87,6 +87,7 @@ export default function YoutuberDetailsClient({ initialData, params }) {
         setShowYear={setShowYear} 
         allMonthArr={allMonthArr} 
         year={year} 
+        showYear={showYear}
       />
       <UserRankingClient
         initialData={initialRankingData}

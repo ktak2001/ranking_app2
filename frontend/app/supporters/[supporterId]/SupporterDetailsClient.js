@@ -44,7 +44,8 @@ export default function SupporterDetailsClient({ supporterInfo, params }) {
         setSelectedMonth={setSelectedMonth} 
         setShowYear={setShowYear} 
         allMonthArr={allMonthArr} 
-        year={year} 
+        year={year}
+        showYear={showYear}
       />
       <div className="container text-center">
         <div className="row">

@@ -361,26 +361,33 @@ def getYoutubersRanking():
   return sortedRes
 
 
-@app.route("/getSupporterMonthRanking", methods=["POST"])
-def getSupporterMonthRanking():
+@app.route("/getSupporterRanking", methods=["POST"])
+def getSupporterRanking():
   # print("request in getRanking", request)
   data = request.get_json()
   _year = '_'+ data['year']
   _month = '_'+ data['month']
   youtuberId = data['youtuberId']
+  showYear = data['showYear']
 
   print("data", data)
   print("channelId", youtuberId)
 
   youtuber_ref = db.collection('youtubers').document(youtuberId)
   youtuberName = (youtuber_ref.get().to_dict())['youtuberName']
-  total_month_amount = (youtuber_ref.collection('summary').document(_year).get().to_dict()).get('monthlyAmount', {}).get(_month, 0)
-  youtuber_supporter_list = youtuber_ref.collection('supporters').order_by(f"monthlyAmount.{_year}{_month}", direction=firestore.Query.DESCENDING).limit(30).stream()
+  if showYear:
+    total_amount = (youtuber_ref.collection('summary').document(_year).get().to_dict()).get('totalAmount', 0)
+    youtuber_supporter_list = youtuber_ref.collection('supporters').order_by(f"yearlyAmount.{_year}", direction=firestore.Query.DESCENDING).limit(30).stream()
+  else:
+    total_amount = (youtuber_ref.collection('summary').document(_year).get().to_dict()).get('monthlyAmount', {}).get(_month, 0)
+    youtuber_supporter_list = youtuber_ref.collection('supporters').order_by(f"monthlyAmount.{_year}{_month}", direction=firestore.Query.DESCENDING).limit(30).stream()
   top_supporters = []
   for supporter in youtuber_supporter_list:
     supporter_data = supporter.to_dict()
-    monthlyAmount = supporter_data.get('monthlyAmount', {})
-    amount = monthlyAmount.get(_year+_month, 0)
+    if showYear:
+      amount = supporter_data.get('monthlyAmount', {}).get(_year+_month, 0)
+    else:
+      amount = supporter_data.get('yearlyAmount', {}).get(_year, 0)
     top_supporters.append({
       'supporterName': supporter_data['supporterName'],
       'supporterId': supporter.id,
@@ -388,7 +395,7 @@ def getSupporterMonthRanking():
       "supporterIconUrl": supporter_data['supporterIconUrl']
     })
   return {
-    "total_month_amount": total_month_amount,
+    "total_amount": total_amount,
     "top_supporters": top_supporters,
     'youtuberName': youtuberName
   }

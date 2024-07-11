@@ -13,13 +13,13 @@ export default function ClientHome({ initialYoutubers, year, month }) {
   const allMonthArr = Array.from({length: parseInt(month) - 3}, (_, i) => String(parseInt(month) - i).padStart(2, '0'));
   useEffect(() => {
     if (currentMonth !== selectedMonth) {
-      getYoutubersRanking(year, selectedMonth)
+      getYoutubersRanking(year, selectedMonth, showYear)
         .then(data => {
           setYoutubers(data)
           setCurrentMonth(selectedMonth)
         })
     }
-  }, [year, selectedMonth])
+  }, [year, selectedMonth, showYear])
   return (
     <div>
       <TabNavigation 
@@ -27,7 +27,8 @@ export default function ClientHome({ initialYoutubers, year, month }) {
         setSelectedMonth={setSelectedMonth}
         setShowYear={setShowYear}
         allMonthArr={allMonthArr} 
-        year={year} 
+        year={year}
+        showYear={showYear}
       />
       <div className="container text-center">
         <div className="row">
