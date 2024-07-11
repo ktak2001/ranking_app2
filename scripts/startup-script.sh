@@ -17,7 +17,7 @@ log() {
 
 upload_log() {
     if [ -f "$LOG_FILE" ]; then
-        gsutil -n cp "$LOG_FILE" "gs://$BUCKET_NAME/logs/startup-script-$(date +%Y%m%d-%H%M%S).log"
+        gsutil cp "$LOG_FILE" "gs://$BUCKET_NAME/logs/startup-script-$(date +%Y%m%d-%H%M%S).log"
     fi
 }
 

@@ -98,7 +98,6 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, processing_y
     }, merge=True)
     # logging.info(f"processing_supporter: {supporter}")
 
-@retry.Retry(predicate=retry.if_exception_type(requests.exceptions.RequestException))
 def get_channel_details(supporter_id):
     api_str = f"https://youtube.googleapis.com/youtube/v3/channels?part=contentDetails,snippet&id={supporter_id}&key={YOUTUBE_API_KEY}"
     response = requests.get(api_str)
