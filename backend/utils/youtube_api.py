@@ -2,6 +2,7 @@ import requests
 from config import YOUTUBE_API_KEY
 from chat_downloader import ChatDownloader
 from utils.common import get_currency_json
+import logging
 
 class YouTubeAPI:
   BASE_URL = "https://www.googleapis.com/youtube/v3"
@@ -68,7 +69,7 @@ class YouTubeAPI:
     try:
       chat = ChatDownloader().get_chat(url, message_groups=["superchat"])
     except Exception as err:
-      print(f"error: {err=}")
+      logging.error(f"error: {err=}")
       raise
     total_superchat_earnings = 0.0
     res = {}
@@ -85,7 +86,7 @@ class YouTubeAPI:
           "amount": jpn_msg,
           "supporterIconUrl": message['author']['images'][0]['url']
         }
-        print("chat No.", i, ": ", obj)
+        logging.info(f"chat No.{i}: obj")
         if supporter_id not in res:
           res[supporter_id] = obj
         else:

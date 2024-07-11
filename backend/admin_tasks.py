@@ -83,7 +83,7 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, processing_y
     processing_youtubers_video_ref.set({
         "supporterRef": firestore.ArrayUnion([supporter_id])
     }, merge=True)
-    logging.info(f"processing_supporter: {supporter}")
+    # logging.info(f"processing_supporter: {supporter}")
 
 @retry.Retry(predicate=retry.if_exception_type(requests.exceptions.RequestException))
 def get_channel_details(supporter_id):
@@ -116,7 +116,7 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
             "youtuberIconUrl": youtuber_icon_url,
             "youtuberCustomUrl": youtuber_custom_url
         })
-    logging.info(f"is_processing: {is_processing}")
+    logging.info(f"is_processing: {is_processing}, {youtuber_id}, {video_id}")
     if not is_processing:
         youtuber_ref.set({
             "totalAmount": firestore.Increment(video_total_earning)
@@ -126,7 +126,7 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
             "youtuberSupporterRef": [],
             "supporterRef": []
         })
-        logging.info(f"set is_processing, {youtuber_id}, {video_id}")
+        # logging.info(f"set is_processing, {youtuber_id}, {video_id}")
     if not is_processing or not processing_youtubers_video_data.get("summary", False):
         youtuber_summary_year_ref = youtuber_ref.collection("summary").document(_year)
         youtuber_summary_year_ref.set({
@@ -144,11 +144,10 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
     for _, supporter in all_supporters_info.items():
         supporter['supporterCustomUrl'] = channel_details[supporter['supporterId']]['items'][0]['snippet']['customUrl']
         update_supporter(supporter, _year, _month, supporter['amount'], youtuber_id, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing)
-    
     youtuber_ref.set({
         "videoIds": firestore.ArrayUnion([video_id])
     })
-    # processing_youtubers_video_ref.delete()
+    processing_youtubers_video_ref.delete()
 
 def set_youtuber_superChats(youtubers):
     try:
