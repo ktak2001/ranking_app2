@@ -9,6 +9,9 @@ import hmac
 import logging
 from datetime import datetime, timedelta
 from google.api_core import retry
+import time
+from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
+import sys
 
 youtube_api = YouTubeAPI()
 tasks_blueprint = Blueprint('tasks', __name__)
@@ -25,6 +28,10 @@ def update_currency():
         "updated": True
     }
 
+@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=2, min=5, max=60))
+def get_superchats_with_retry(yt_url):
+    return youtube_api.get_superchats(yt_url)
+
 def update_for_each_video(youtuber_info, video):
     video_info = {
         "_year": '_' + (video['snippet']['publishedAt'])[:4],
@@ -34,9 +41,15 @@ def update_for_each_video(youtuber_info, video):
     yt_url = f'https://www.youtube.com/watch?v={video["id"]}'
     youtuber_doc = db.collection("youtubers").document(youtuber_info['youtuber_id']).get().to_dict()
     if youtuber_doc is None or video['id'] not in youtuber_doc.get('video_ids', []):
-        all_supporters_info, video_total_earning = youtube_api.get_superchats(yt_url)
-        video_info['video_total_earning'] = video_total_earning
-        update_doc(youtuber_info, video_info, all_supporters_info)
+        try:
+            all_supporters_info, video_total_earning = get_superchats_with_retry(yt_url)
+            video_info['video_total_earning'] = video_total_earning
+            update_doc(youtuber_info, video_info, all_supporters_info)
+        except RetryError as e:
+            logging.error(f"Failed to process video {video['id']} after 5 retries: {str(e)}")
+            raise  # この例外を再度発生させ、呼び出し元に伝播させる
+        finally:
+            time.sleep(5)
 
 def update_supporter(supporter, _year, _month, amount, youtuber_id, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing):
     supporter_name, supporter_id, supporter_icon_url, supporter_custom_url = (
@@ -212,4 +225,3 @@ def authenticate_admin(request):
     expected_hash = hashlib.sha256(ADMIN_PASSWORD.encode('utf-8')).hexdigest()
 
     return hmac.compare_digest(password_hash, expected_hash)
-
