@@ -100,8 +100,11 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
     _year = video_info['_year']
     _month = video_info['_month']
     video_total_earning = video_info['video_total_earning']
-
-    processing_youtubers_video_ref = db.collection("processing_youtubers").document(youtuber_id).collection("videos").document(video_id)
+    processing_youtubers_ref = db.collection("processing_youtubers").document(youtuber_id)
+    processing_youtubers_ref.set({
+        "processed": firestore.ArrayUnion([video_id])
+    }, merge=True)
+    processing_youtubers_video_ref = processing_youtubers_ref.collection("videos").document(video_id)
     processing_youtubers_video_doc = processing_youtubers_video_ref.get()
     is_processing = processing_youtubers_video_doc.exists
     processing_youtubers_video_data = processing_youtubers_video_doc.to_dict() if is_processing else {}
