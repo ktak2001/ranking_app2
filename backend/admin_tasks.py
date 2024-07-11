@@ -126,7 +126,7 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
             "youtuberSupporterRef": [],
             "supporterRef": []
         })
-        # logging.info(f"set is_processing, {youtuber_id}, {video_id}")
+        logging.info(f"set is_processing, {youtuber_id}, {video_id}")
     if not is_processing or not processing_youtubers_video_data.get("summary", False):
         youtuber_summary_year_ref = youtuber_ref.collection("summary").document(_year)
         youtuber_summary_year_ref.set({
@@ -146,7 +146,7 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
         update_supporter(supporter, _year, _month, supporter['amount'], youtuber_id, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing)
     youtuber_ref.set({
         "videoIds": firestore.ArrayUnion([video_id])
-    })
+    }, merge=True)
     processing_youtubers_video_ref.delete()
 
 def set_youtuber_superChats(youtubers):
