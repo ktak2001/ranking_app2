@@ -93,10 +93,9 @@ def update_for_each_video(youtuber_info, video):
         }
         yt_url = f'https://www.youtube.com/watch?v={video["id"]}'
         youtuber_doc = db.collection("youtubers").document(youtuber_info['youtuber_id']).get().to_dict()
-        if youtuber_doc is None or video['id'] not in youtuber_doc.get('videoIds', []):
-            all_supporters_info, video_total_earning = get_superchats_with_retry(yt_url)
-            video_info['video_total_earning'] = video_total_earning
-            update_doc(youtuber_info, video_info, all_supporters_info)
+        all_supporters_info, video_total_earning = get_superchats_with_retry(yt_url)
+        video_info['video_total_earning'] = video_total_earning
+        update_doc(youtuber_info, video_info, all_supporters_info)
     except RetryError as e:
         logging.error(f"Failed to process video {video['id']} after 5 retries: {str(e)}")
         sys.exit(1)  # スクリプトを終了
@@ -173,11 +172,13 @@ def set_youtuber_superChats(youtubers):
             logging.info(f"Retrieved {len(video_ids)} videos for {youtuber_name}")
             
             for vid_id in video_ids:
-                vid_info = youtube_api.get_video_details(vid_id)
-                if vid_info.get('liveStreamingDetails') is None or vid_info['snippet']['liveBroadcastContent'] == 'live' or vid_info['liveStreamingDetails'].get('actualEndTime') is None:
-                    continue
-                logging.info(f"Updating {youtuber_name}'s video: {vid_id}")
-                update_for_each_video(youtuber_info, vid_info)
+                youtuber_doc = db.collection("youtubers").document(youtuber_info['youtuber_id']).get().to_dict()
+                if youtuber_doc is None or vid_id not in youtuber_doc.get('videoIds', []):
+                    vid_info = youtube_api.get_video_details(vid_id)
+                    if vid_info.get('liveStreamingDetails') is None or vid_info['snippet']['liveBroadcastContent'] == 'live' or vid_info['liveStreamingDetails'].get('actualEndTime') is None:
+                        continue
+                    logging.info(f"Updating {youtuber_name}'s video: {vid_id}")
+                    update_for_each_video(youtuber_info, vid_info)
         
         return {"success": True}
     except Exception as e:

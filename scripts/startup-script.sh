@@ -58,7 +58,9 @@ pip3 install -r requirements.txt
 log "Running admin tasks script..."
 export PYTHONPATH="/ranking_app2/backend:$PYTHONPATH"
 cd /ranking_app2/backend
-ENVIRONMENT=production GOOGLE_CLOUD_PROJECT=ranking-app-bf2df python3 ../scripts/set_youtubers.py 2>&1 | tee -a "$LOG_FILE"
+ENVIRONMENT=production GOOGLE_CLOUD_PROJECT=ranking-app-bf2df python3 ../scripts/set_youtubers.py 2>&1 | while IFS= read -r line; do
+    log "$line"
+done
 
 if [ $? -ne 0 ]; then
     log "Error occurred during task execution."
