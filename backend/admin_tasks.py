@@ -15,9 +15,18 @@ from tenacity import retry, stop_after_attempt, wait_exponential, RetryError, re
 youtube_api = YouTubeAPI()
 tasks_blueprint = Blueprint('tasks', __name__)
 
-@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=2, min=5, max=60), retry=retry_if_exception_type(requests.exceptions.RequestException))
+@retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=4, min=30, max=180),
+        retry=retry_if_exception_type((requests.exceptions.RequestException, Exception)),
+        before_sleep=lambda retry_state: logging.info(f"Retrying get_superchats (attempt {retry_state.attempt_number})")
+      )
 def get_superchats_with_retry(yt_url):
-    return youtube_api.get_superchats(yt_url)
+    try:
+        return youtube_api.get_superchats(yt_url)
+    except Exception as e:
+        logging.error(f"Error in get_superchats: {str(e)}")
+        raise  # This will trigger the retry
 
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=60), retry=retry_if_exception_type(requests.exceptions.RequestException))
 def get_supporter_custom_url(supporter_id):
@@ -92,7 +101,7 @@ def update_for_each_video(youtuber_info, video):
             "video_id": video['id']
         }
         yt_url = f'https://www.youtube.com/watch?v={video["id"]}'
-        youtuber_doc = db.collection("youtubers").document(youtuber_info['youtuber_id']).get().to_dict()
+        time.sleep(5)
         all_supporters_info, video_total_earning = get_superchats_with_retry(yt_url)
         video_info['video_total_earning'] = video_total_earning
         update_doc(youtuber_info, video_info, all_supporters_info)
@@ -176,10 +185,12 @@ def set_youtuber_superChats(youtubers):
                 if youtuber_doc is None or vid_id not in youtuber_doc.get('videoIds', []):
                     vid_info = youtube_api.get_video_details(vid_id)
                     if vid_info.get('liveStreamingDetails') is None or vid_info['snippet']['liveBroadcastContent'] == 'live' or vid_info['liveStreamingDetails'].get('actualEndTime') is None:
+                        logging.info(f"{youtuber_name}'s video: {vid_id} is not live streaming, or still onlive")
                         continue
                     logging.info(f"Updating {youtuber_name}'s video: {vid_id}")
                     update_for_each_video(youtuber_info, vid_info)
-        
+                else:
+                    logging.info(f"{youtuber_name}'s video: {vid_id} was already processed")
         return {"success": True}
     except Exception as e:
         logging.error(f"Critical error in set_youtuber_superChats: {str(e)}")
