@@ -58,7 +58,7 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, processing_y
     new_amount = firestore.Increment(amount)
     youtuber_supporter_ref = db.collection('youtubers').document(youtuber_id).collection('supporters').document(supporter_id)
     supporter_ref = db.collection("supporters").document(supporter_id)
-    supporter_doc = supporter_ref.get().exists
+    supporter_doc = supporter_ref.get()
     if not supporter_doc.exists:
         supporter_custom_url = get_supporter_custom_url(supporter_id)
     else:
@@ -106,7 +106,10 @@ def get_supporter_custom_url(supporter_id):
     api_str = f"https://youtube.googleapis.com/youtube/v3/channels?part=contentDetails,snippet&id={supporter_id}&key={YOUTUBE_API_KEY}"
     response = requests.get(api_str)
     response.raise_for_status()
-    return response['items'][0]['snippet']['customUrl']
+    data = response.json()
+    if 'items' in data and len(data['items']) > 0:
+        return data['items'][0]['snippet'].get('customUrl', '@')
+    return '@'
 
 def update_doc(youtuber_info, video_info, all_supporters_info):
     youtuber_id, youtuber_name, youtuber_icon_url, youtuber_custom_url = (
@@ -117,9 +120,6 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
     _month = video_info['_month']
     video_total_earning = video_info['video_total_earning']
     processing_youtubers_ref = db.collection("processing_youtubers").document(youtuber_id)
-    processing_youtubers_ref.set({
-        "processed": firestore.ArrayUnion([video_id])
-    }, merge=True)
     processing_youtubers_video_ref = processing_youtubers_ref.collection("videos").document(video_id)
     processing_youtubers_video_doc = processing_youtubers_video_ref.get()
     is_processing = processing_youtubers_video_doc.exists
@@ -161,6 +161,9 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
         update_supporter(supporter, _year, _month, supporter['amount'], youtuber_id, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing)
     youtuber_ref.set({
         "videoIds": firestore.ArrayUnion([video_id])
+    }, merge=True)
+    processing_youtubers_ref.set({
+        "processed": firestore.ArrayUnion([video_id])
     }, merge=True)
     processing_youtubers_video_ref.delete()
 
