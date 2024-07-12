@@ -8,108 +8,103 @@ import hashlib
 import hmac
 import logging
 from datetime import datetime, timedelta
-from google.api_core import retry
 import time
-from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
 import sys
+from tenacity import retry, stop_after_attempt, wait_exponential, RetryError, retry_if_exception_type
 
 youtube_api = YouTubeAPI()
 tasks_blueprint = Blueprint('tasks', __name__)
 
-
-@tasks_blueprint.route('/tasks/update_currency', methods=['GET'])
-def update_currency():
-    currency_res = requests.get("https://v6.exchangerate-api.com/v6/efa278f126f16633add02fb6/latest/JPY")
-    currency_json = currency_res.json()
-    currency_json['conversion_rates']['₫'] = currency_json['conversion_rates']['VND']
-    currency_json['conversion_rates']['₱'] = currency_json['conversion_rates']['PHP']
-    db.collection('currency').document('latest').set(currency_json)
-    return {
-        "updated": True
-    }
-
-@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=2, min=5, max=60))
+@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=2, min=5, max=60), retry=retry_if_exception_type(requests.exceptions.RequestException))
 def get_superchats_with_retry(yt_url):
     return youtube_api.get_superchats(yt_url)
 
-def update_for_each_video(youtuber_info, video):
-    video_info = {
-        "_year": '_' + (video['snippet']['publishedAt'])[:4],
-        "_month": '_' + (video['snippet']['publishedAt'])[5:7],
-        "video_id": video['id']
-    }
-    yt_url = f'https://www.youtube.com/watch?v={video["id"]}'
-    youtuber_doc = db.collection("youtubers").document(youtuber_info['youtuber_id']).get().to_dict()
-    if youtuber_doc is None or video['id'] not in youtuber_doc.get('videoIds', []):
-        try:
-            all_supporters_info, video_total_earning = get_superchats_with_retry(yt_url)
-            video_info['video_total_earning'] = video_total_earning
-            update_doc(youtuber_info, video_info, all_supporters_info)
-        except RetryError as e:
-            logging.error(f"Failed to process video {video['id']} after 5 retries: {str(e)}")
-            raise  # この例外を再度発生させ、呼び出し元に伝播させる
-        finally:
-            time.sleep(5)
-
-def update_supporter(supporter, _year, _month, amount, youtuber_id, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing):
-    supporter_name, supporter_id, supporter_icon_url = (
-        supporter[k] for k in ('supporterName', 'supporterId', 'supporterIconUrl')
-    )
-    new_amount = firestore.Increment(amount)
-    youtuber_supporter_ref = db.collection('youtubers').document(youtuber_id).collection('supporters').document(supporter_id)
-    supporter_ref = db.collection("supporters").document(supporter_id)
-    supporter_doc = supporter_ref.get()
-    if not supporter_doc.exists:
-        supporter_custom_url = get_supporter_custom_url(supporter_id)
-    else:
-        supporter_custom_url = supporter_doc.get('supporterCustomUrl', "@")
-    if is_processing and supporter_id in processing_youtubers_video_data.get("youtuberSupporterRef", []):
-        return
-    youtuber_supporter_ref.set({
-        "supporterName": supporter_name,
-        "supporterId": supporter_id,
-        "supporterIconUrl": supporter_icon_url,
-        "supporterCustomUrl": supporter_custom_url,
-        "totalAmount": new_amount,
-        "monthlyAmount": {
-            _year + _month: new_amount
-        },
-        "yearlyAmount": {
-            _year: new_amount
-        },
-    }, merge=True)
-    processing_youtubers_video_ref.set({
-        "youtuberSupporterRef": firestore.ArrayUnion([supporter_id])
-    }, merge=True)
-    if is_processing and supporter_id in processing_youtubers_video_data.get("supporterRef", []):
-        return
-    if not supporter_doc.exists:
-        supporter_ref.set({
-            "supporterName": supporter_name,
-            "supporterId": supporter_id,
-            "connectedUser": None,
-            "supporterIconUrl": supporter_icon_url,
-            "supporterCustomUrl": supporter_custom_url,
-        })
-    supporter_ref.set({
-        "supportedYoutubers": {
-            _year: firestore.ArrayUnion([youtuber_id]),
-            _year + _month: firestore.ArrayUnion([youtuber_id]),
-        },
-    }, merge=True)
-    processing_youtubers_video_ref.set({
-        "supporterRef": firestore.ArrayUnion([supporter_id])
-    }, merge=True)
-    # logging.info(f"processing_supporter: {supporter}")
-
+@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=60), retry=retry_if_exception_type(requests.exceptions.RequestException))
 def get_supporter_custom_url(supporter_id):
-    api_str = f"https://youtube.googleapis.com/youtube/v3/channels?part=contentDetails,snippet&id={supporter_id}&key={YOUTUBE_API_KEY}"
+    api_str = f"https://youtube.googleapis.com/youtube/v3/channels?part=snippet&id={supporter_id}&key={YOUTUBE_API_KEY}"
     response = requests.get(api_str)
     response.raise_for_status()
     data = response.json()
     if 'items' in data and len(data['items']) > 0:
         return data['items'][0]['snippet'].get('customUrl', '@')
     return '@'
+
+def update_supporter(supporter, _year, _month, amount, youtuber_id, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing):
+    try:
+        supporter_name, supporter_id, supporter_icon_url = (
+            supporter[k] for k in ('supporterName', 'supporterId', 'supporterIconUrl')
+        )
+        new_amount = firestore.Increment(amount)
+        youtuber_supporter_ref = db.collection('youtubers').document(youtuber_id).collection('supporters').document(supporter_id)
+        supporter_ref = db.collection("supporters").document(supporter_id)
+        supporter_doc = supporter_ref.get()
+        
+        if not supporter_doc.exists:
+            supporter_custom_url = get_supporter_custom_url(supporter_id)
+        else:
+            supporter_data = supporter_doc.to_dict()
+            supporter_custom_url = supporter_data.get('supporterCustomUrl', "@")
+        
+        youtuber_supporter_ref.set({
+            "supporterName": supporter_name,
+            "supporterId": supporter_id,
+            "supporterIconUrl": supporter_icon_url,
+            "supporterCustomUrl": supporter_custom_url,
+            "totalAmount": new_amount,
+            "monthlyAmount": {
+                _year + _month: new_amount
+            },
+            "yearlyAmount": {
+                _year: new_amount
+            },
+        }, merge=True)
+        processing_youtubers_video_ref.set({
+            "youtuberSupporterRef": firestore.ArrayUnion([supporter_id])
+        }, merge=True)
+        if is_processing and supporter_id in processing_youtubers_video_data.get("supporterRef", []):
+            return
+        if not supporter_doc.exists:
+            supporter_ref.set({
+                "supporterName": supporter_name,
+                "supporterId": supporter_id,
+                "connectedUser": None,
+                "supporterIconUrl": supporter_icon_url,
+                "supporterCustomUrl": supporter_custom_url,
+            })
+        supporter_ref.set({
+            "supportedYoutubers": {
+                _year: firestore.ArrayUnion([youtuber_id]),
+                _year + _month: firestore.ArrayUnion([youtuber_id]),
+            },
+        }, merge=True)
+        processing_youtubers_video_ref.set({
+            "supporterRef": firestore.ArrayUnion([supporter_id])
+        }, merge=True)
+    except Exception as e:
+        logging.error(f"Error in update_supporter: {str(e)}")
+        raise  # この例外を再度発生させ、呼び出し元に伝播させる
+
+def update_for_each_video(youtuber_info, video):
+    try:
+        video_info = {
+            "_year": '_' + (video['snippet']['publishedAt'])[:4],
+            "_month": '_' + (video['snippet']['publishedAt'])[5:7],
+            "video_id": video['id']
+        }
+        yt_url = f'https://www.youtube.com/watch?v={video["id"]}'
+        youtuber_doc = db.collection("youtubers").document(youtuber_info['youtuber_id']).get().to_dict()
+        if youtuber_doc is None or video['id'] not in youtuber_doc.get('videoIds', []):
+            all_supporters_info, video_total_earning = get_superchats_with_retry(yt_url)
+            video_info['video_total_earning'] = video_total_earning
+            update_doc(youtuber_info, video_info, all_supporters_info)
+    except RetryError as e:
+        logging.error(f"Failed to process video {video['id']} after 5 retries: {str(e)}")
+        sys.exit(1)  # スクリプトを終了
+    except Exception as e:
+        logging.error(f"Unexpected error in update_for_each_video: {str(e)}")
+        sys.exit(1)  # スクリプトを終了
+    finally:
+        time.sleep(5)
 
 def update_doc(youtuber_info, video_info, all_supporters_info):
     youtuber_id, youtuber_name, youtuber_icon_url, youtuber_custom_url = (
@@ -186,8 +181,8 @@ def set_youtuber_superChats(youtubers):
         
         return {"success": True}
     except Exception as e:
-        logging.error(f"Error in set_youtuber_superChats: {str(e)}")
-        return {"error": str(e)}
+        logging.error(f"Critical error in set_youtuber_superChats: {str(e)}")
+        sys.exit(1)  # スクリプトを終了
 
 # @tasks_blueprint.route('/tasks/update_youtubers', methods=['GET'])
 def update_youtubers():
