@@ -40,7 +40,7 @@ def update_for_each_video(youtuber_info, video):
     }
     yt_url = f'https://www.youtube.com/watch?v={video["id"]}'
     youtuber_doc = db.collection("youtubers").document(youtuber_info['youtuber_id']).get().to_dict()
-    if youtuber_doc is None or video['id'] not in youtuber_doc.get('video_ids', []):
+    if youtuber_doc is None or video['id'] not in youtuber_doc.get('videoIds', []):
         try:
             all_supporters_info, video_total_earning = get_superchats_with_retry(yt_url)
             video_info['video_total_earning'] = video_total_earning
@@ -52,11 +52,17 @@ def update_for_each_video(youtuber_info, video):
             time.sleep(5)
 
 def update_supporter(supporter, _year, _month, amount, youtuber_id, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing):
-    supporter_name, supporter_id, supporter_icon_url, supporter_custom_url = (
-        supporter[k] for k in ('supporterName', 'supporterId', 'supporterIconUrl', 'supporterCustomUrl')
+    supporter_name, supporter_id, supporter_icon_url = (
+        supporter[k] for k in ('supporterName', 'supporterId', 'supporterIconUrl')
     )
     new_amount = firestore.Increment(amount)
     youtuber_supporter_ref = db.collection('youtubers').document(youtuber_id).collection('supporters').document(supporter_id)
+    supporter_ref = db.collection("supporters").document(supporter_id)
+    supporter_doc = supporter_ref.get().exists
+    if not supporter_doc.exists:
+        supporter_custom_url = get_supporter_custom_url(supporter_id)
+    else:
+        supporter_custom_url = supporter_doc.get('supporterCustomUrl', "@")
     if is_processing and supporter_id in processing_youtubers_video_data.get("youtuberSupporterRef", []):
         return
     youtuber_supporter_ref.set({
@@ -75,8 +81,6 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, processing_y
     processing_youtubers_video_ref.set({
         "youtuberSupporterRef": firestore.ArrayUnion([supporter_id])
     }, merge=True)
-    supporter_ref = db.collection("supporters").document(supporter_id)
-    supporter_doc = supporter_ref.get()
     if is_processing and supporter_id in processing_youtubers_video_data.get("supporterRef", []):
         return
     if not supporter_doc.exists:
@@ -98,11 +102,11 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, processing_y
     }, merge=True)
     # logging.info(f"processing_supporter: {supporter}")
 
-def get_channel_details(supporter_id):
+def get_supporter_custom_url(supporter_id):
     api_str = f"https://youtube.googleapis.com/youtube/v3/channels?part=contentDetails,snippet&id={supporter_id}&key={YOUTUBE_API_KEY}"
     response = requests.get(api_str)
     response.raise_for_status()
-    return response.json()
+    return response['items'][0]['snippet']['customUrl']
 
 def update_doc(youtuber_info, video_info, all_supporters_info):
     youtuber_id, youtuber_name, youtuber_icon_url, youtuber_custom_url = (
@@ -153,11 +157,7 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
         processing_youtubers_video_ref.set({
             "summary": True
         }, merge=True)
-    supporter_ids = [supporter['supporterId'] for supporter in all_supporters_info.values()]
-    channel_details = {supporter_id: get_channel_details(supporter_id) for supporter_id in set(supporter_ids)}
-
     for _, supporter in all_supporters_info.items():
-        supporter['supporterCustomUrl'] = channel_details[supporter['supporterId']]['items'][0]['snippet']['customUrl']
         update_supporter(supporter, _year, _month, supporter['amount'], youtuber_id, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing)
     youtuber_ref.set({
         "videoIds": firestore.ArrayUnion([video_id])
