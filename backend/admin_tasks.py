@@ -28,7 +28,7 @@ def get_superchats_with_retry(yt_url):
         logging.error(f"Error in get_superchats: {str(e)}")
         raise  # This will trigger the retry
 
-@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=60), retry=retry_if_exception_type(requests.exceptions.RequestException))
+@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=2, min=30, max=300), retry=retry_if_exception_type(requests.exceptions.RequestException))
 def get_supporter_custom_url(supporter_id):
     api_str = f"https://youtube.googleapis.com/youtube/v3/channels?part=snippet&id={supporter_id}&key={YOUTUBE_API_KEY}"
     response = requests.get(api_str)
@@ -101,7 +101,7 @@ def update_for_each_video(youtuber_info, video):
             "video_id": video['id']
         }
         yt_url = f'https://www.youtube.com/watch?v={video["id"]}'
-        time.sleep(5)
+        time.sleep(30)
         all_supporters_info, video_total_earning = get_superchats_with_retry(yt_url)
         video_info['video_total_earning'] = video_total_earning
         update_doc(youtuber_info, video_info, all_supporters_info)
