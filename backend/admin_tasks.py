@@ -15,21 +15,23 @@ from chat_downloader.errors import NoChatReplay, ChatDisabled, VideoUnavailable,
 youtube_api = YouTubeAPI()
 tasks_blueprint = Blueprint('tasks', __name__)
 
+logger = logging.getLogger(__name__)
+
 @retry(
         stop=stop_after_attempt(5),
         wait=wait_exponential(multiplier=4, min=30, max=180),
         retry=retry_if_exception_type((requests.exceptions.RequestException, Exception)),
-        before_sleep=lambda retry_state: logging.info(f"Retrying get_superchats (attempt {retry_state.attempt_number})")
+        before_sleep=lambda retry_state: logger.info(f"Retrying get_superchats (attempt {retry_state.attempt_number})")
       )
 def get_superchats_with_retry(yt_url):
     try:
         return youtube_api.get_superchats(yt_url)
     except (NoChatReplay, ChatDisabled, VideoUnavailable, LoginRequired) as e:
         error_name = type(e).__name__
-        logging.info(f"{error_name}: {str(e)} - {yt_url}")
+        logger.info(f"{error_name}: {str(e)} - {yt_url}")
         return None, error_name
     except Exception as e:
-        logging.error(f"Error in get_superchats: {str(e)}")
+        logger.error(f"Error in get_superchats: {str(e)}")
         raise  # This will trigger the retry
 
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=2, min=30, max=300), retry=retry_if_exception_type(requests.exceptions.RequestException))
@@ -94,7 +96,7 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, processing_y
             "supporterRef": firestore.ArrayUnion([supporter_id])
         }, merge=True)
     except Exception as e:
-        logging.error(f"Error in update_supporter: {str(e)}")
+        logger.error(f"Error in update_supporter: {str(e)}")
         raise  # この例外を再度発生させ、呼び出し元に伝播させる
 
 def update_for_each_video(youtuber_info, video):
@@ -119,10 +121,10 @@ def update_for_each_video(youtuber_info, video):
         video_info['video_total_earning'] = video_total_earning
         update_doc(youtuber_info, video_info, all_supporters_info)
     except RetryError as e:
-        logging.error(f"Failed to process video {video['id']} after 5 retries: {str(e)}")
+        logger.error(f"Failed to process video {video['id']} after 5 retries: {str(e)}")
         sys.exit(1)  # スクリプトを終了
     except Exception as e:
-        logging.error(f"Unexpected error in update_for_each_video: {str(e)}")
+        logger.error(f"Unexpected error in update_for_each_video: {str(e)}")
         sys.exit(1)  # スクリプトを終了
     finally:
         time.sleep(5)
@@ -151,7 +153,7 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
             "youtuberIconUrl": youtuber_icon_url,
             "youtuberCustomUrl": youtuber_custom_url
         })
-    logging.info(f"is_processing: {is_processing}, {youtuber_id}, {video_id}")
+    logger.info(f"is_processing: {is_processing}, {youtuber_id}, {video_id}")
     if not is_processing:
         youtuber_ref.set({
             "totalAmount": firestore.Increment(video_total_earning)
@@ -161,7 +163,7 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
             "youtuberSupporterRef": [],
             "supporterRef": []
         })
-        logging.info(f"set is_processing, {youtuber_id}, {video_id}")
+        logger.info(f"set is_processing, {youtuber_id}, {video_id}")
     if not is_processing or not processing_youtubers_video_data.get("summary", False):
         youtuber_summary_year_ref = youtuber_ref.collection("summary").document(_year)
         youtuber_summary_year_ref.set({
@@ -186,29 +188,36 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
 def set_youtuber_superChats(youtubers):
     try:
         for youtuber in youtubers:
-            youtuber_id = youtuber['youtuberId']
-            youtuber_name = youtuber['youtuberName']
-            logging.info(f"Processing youtuber: {youtuber_name} ({youtuber_id})")
+            youtuber_id = youtuber.get('youtuberId')
+            youtuber_name = youtuber.get('youtuberName')
+            if not youtuber_id or not youtuber_name:
+                logger.warning(f"Skipping youtuber due to missing data: {youtuber}")
+                continue
+            logger.info(f"Processing youtuber: {youtuber_name} ({youtuber_id})")
             
             youtuber_info, video_ids = youtube_api.get_videos_until_date(youtuber_id, 2024, 3, 31)
-            logging.info(f"Retrieved {len(video_ids)} videos for {youtuber_name}")
-            
+            logger.info(f"Retrieved {len(video_ids)} videos for {youtuber_name}")
+            youtuber_doc = db.collection("youtubers").document(youtuber_info['youtuber_id']).get()
+            if not youtuber_doc.exists:
+                youtuber_data = None
+            else:
+                youtuber_data = youtuber_doc.to_dict()
+            processed_video_ids = youtuber_data.get('videoIds', []) if youtuber_data is not None else []
+            unnecessary_video_ids = [item['id'] for item in youtuber_data.get('unnecessaryVideoIds', [])] if youtuber_data is not None else []
+
             for vid_id in video_ids:
-                youtuber_doc = db.collection("youtubers").document(youtuber_info['youtuber_id']).get().to_dict()
-                processed_video_ids = youtuber_doc.get('videoIds', [])
-                unnecessary_video_ids = [item['id'] for item in youtuber_doc.get('unnecessaryVideoIds', [])]
-                if youtuber_doc is None or vid_id not in (processed_video_ids + unnecessary_video_ids):
+                if youtuber_data is None or vid_id not in (processed_video_ids + unnecessary_video_ids):
                     vid_info = youtube_api.get_video_details(vid_id)
                     if vid_info.get('liveStreamingDetails') is None or vid_info['snippet']['liveBroadcastContent'] == 'live' or vid_info['liveStreamingDetails'].get('actualEndTime') is None:
-                        logging.info(f"{youtuber_name}'s video: {vid_id} is not live streaming, or still onlive")
+                        logger.info(f"{youtuber_name}'s video: {vid_id} is not live streaming, or still onlive")
                         continue
-                    logging.info(f"Updating {youtuber_name}'s video: {vid_id}")
+                    logger.info(f"Updating {youtuber_name}'s video: {vid_id}")
                     update_for_each_video(youtuber_info, vid_info)
                 else:
-                    logging.info(f"{youtuber_name}'s video: {vid_id} was already processed")
+                    logger.info(f"{youtuber_name}'s video: {vid_id} was already processed")
         return {"success": True}
     except Exception as e:
-        logging.error(f"Critical error in set_youtuber_superChats: {str(e)}")
+        logger.error(f"Critical error in set_youtuber_superChats: {str(e)}")
         sys.exit(1)  # スクリプトを終了
 
 # @tasks_blueprint.route('/tasks/update_youtubers', methods=['GET'])

@@ -1,9 +1,13 @@
+import google.cloud.logging
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from admin_tasks import set_youtuber_superChats
-
 import logging
+
+client = google.cloud.logging.Client()
+client.setup_logging()
+
 logging.basicConfig(filename='/tmp/startup-script.log', level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 import csv
