@@ -1,3 +1,5 @@
+export PROJECT_ID=ranking-app-bf2df
+
 #!/bin/bash
 PROJECT_ID=$(gcloud config get-value project)
 gcloud run deploy backend \

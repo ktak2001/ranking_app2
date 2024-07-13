@@ -30,7 +30,7 @@ export async function getYoutubersRanking(year, month, showYear) {
   return response.data;
 }
 
-export async function getSupportingYoutubers(year, month, supporterId) {
-  const response = await axiosInstance.post(`/getSupportingYoutubers`, { year, month, supporterId });
+export async function getSupportingYoutubers(year, month, supporterId, showYear) {
+  const response = await axiosInstance.post(`/getSupportingYoutubers`, { year, month, supporterId, showYear });
   return response.data;
 }

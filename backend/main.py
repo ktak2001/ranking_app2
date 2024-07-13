@@ -1,4 +1,4 @@
-from config import YOUTUBE_API_KEY, STRIPE_API_KEY, db, WEB_URL, API_KEY, IS_CLOUD_RUN
+from config import YOUTUBE_API_KEY, STRIPE_API_KEY, db, WEB_URL, IS_CLOUD_RUN
 from utils.common import pretty_json, getFilePath, read_from_json_file, write_into_file, get_currency_json, update_one_supporter
 import numpy as np
 import pandas as pd
@@ -283,10 +283,11 @@ def getSupportingYoutubers():
     supporter_id = data['supporterId']
     year = '_' + data['year']
     month = '_' + data['month']
-    return get_supporting_youtubers(supporter_id, year, month)
+    showYear = data['showYear']
+    return get_supporting_youtubers(supporter_id, year, month, showYear)
 
 @cache_with_persistence()
-def get_supporting_youtubers(supporter_id, year, month):
+def get_supporting_youtubers(supporter_id, year, month, showYear):
     supporters_ref = db.collection('supporters').document(supporter_id)
     
     if not supporters_ref.get().exists:
@@ -296,7 +297,10 @@ def get_supporting_youtubers(supporter_id, year, month):
         }
     
     supporter_data = supporters_ref.get().to_dict()
-    youtubers = supporter_data.get('supportedYoutubers', {}).get(year + month, [])
+    if showYear:
+        youtubers = supporter_data.get('supportedYoutubers', {}).get(year, [])
+    else:
+        youtubers = supporter_data.get('supportedYoutubers', {}).get(year + month, [])
     all_youtubers = []
     
     for youtuber_id in youtubers:
@@ -305,8 +309,13 @@ def get_supporting_youtubers(supporter_id, year, month):
         youtuber_name = youtuber_data['youtuberName']
         youtuber_icon_url = youtuber_data['youtuberIconUrl']
         youtuber_supporter_ref = youtuber_ref.collection('supporters').document(supporter_id)
-        chatted_amount = (youtuber_supporter_ref.get().to_dict()).get('monthlyAmount', {}).get(year + month, 0)
-        youtuber_supporter_list = youtuber_ref.collection('supporters').order_by(f"monthlyAmount.{year}{month}", direction=firestore.Query.DESCENDING).limit(100).stream()
+        if showYear:
+            chatted_amount = (youtuber_supporter_ref.get().to_dict()).get('yearlyAmount', {}).get(year, 0)
+            youtuber_supporter_list = youtuber_ref.collection('supporters').order_by(f"yearlyAmount.{year}", direction=firestore.Query.DESCENDING).limit(100).stream()
+        else:
+            chatted_amount = (youtuber_supporter_ref.get().to_dict()).get('monthlyAmount', {}).get(year + month, 0)
+            youtuber_supporter_list = youtuber_ref.collection('supporters').order_by(f"monthlyAmount.{year}{month}", direction=firestore.Query.DESCENDING).limit(100).stream()
+            
         supporter_rank = 0
         
         for rank, supporter in enumerate(youtuber_supporter_list):

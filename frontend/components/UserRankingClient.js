@@ -14,7 +14,7 @@ export default function UserRankingClient({ initialData, youtuberId, showYear, c
   useEffect(() => {
     // console.log("currentMonth", currentMonth)
     console.log("showYear", showYear)
-    if (currentMonth !== selectedMonth)  {
+    if (showYear || currentMonth !== selectedMonth)  {
       getSupportersRanking(currentYear, selectedMonth, youtuberId, showYear)
         .then(data => {
           setTopSupporters(data.top_supporters)

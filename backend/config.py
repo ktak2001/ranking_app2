@@ -7,10 +7,10 @@ from dotenv import load_dotenv
 # Load environment variables from .env file if present
 load_dotenv()
 
-ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+# ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
+# ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 WEB_URL = os.environ.get('WEB_URL')
-API_KEY = os.environ.get('API_KEY')
+# API_KEY = os.environ.get('API_KEY')
 ENVIRONMENT = os.environ.get('ENVIRONMENT', 'development')
 GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
 PROJECT_ID="ranking-app-bf2df"

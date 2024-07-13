@@ -15,11 +15,11 @@ export default function SupporterDetailsClient({ supporterInfo, params }) {
   const allMonthArr = Array.from({length: parseInt(month) - 3}, (_, i) => String(parseInt(month) - i).padStart(2, '0'));
 
   useEffect(() => {
-    getSupportingYoutubers(year, selectedMonth, params.supporterId)
+    getSupportingYoutubers(year, selectedMonth, params.supporterId, showYear)
       .then(data => {
         setYoutubers(data)
       })
-  }, [year, selectedMonth, params])
+  }, [year, selectedMonth, params, showYear])
 
   return (
     <div>

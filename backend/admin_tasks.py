@@ -1,6 +1,5 @@
-from config import YOUTUBE_API_KEY, STRIPE_API_KEY, db, WEB_URL, ADMIN_USERNAME, ADMIN_PASSWORD, API_KEY, PROJECT_ID
+from config import YOUTUBE_API_KEY, STRIPE_API_KEY, db, WEB_URL, PROJECT_ID
 from utils.youtube_api import YouTubeAPI
-from utils.common import pretty_json, getFilePath, read_from_json_file, write_into_file, get_currency_json, update_one_supporter
 from firebase_admin import firestore
 from flask import Blueprint, request, abort, jsonify
 import requests
@@ -11,6 +10,7 @@ from datetime import datetime, timedelta
 import time
 import sys
 from tenacity import retry, stop_after_attempt, wait_exponential, RetryError, retry_if_exception_type
+from chat_downloader.errors import NoChatReplay, ChatDisabled, VideoUnavailable, LoginRequired
 
 youtube_api = YouTubeAPI()
 tasks_blueprint = Blueprint('tasks', __name__)
@@ -24,6 +24,10 @@ tasks_blueprint = Blueprint('tasks', __name__)
 def get_superchats_with_retry(yt_url):
     try:
         return youtube_api.get_superchats(yt_url)
+    except (NoChatReplay, ChatDisabled, VideoUnavailable, LoginRequired) as e:
+        error_name = type(e).__name__
+        logging.info(f"{error_name}: {str(e)} - {yt_url}")
+        return None, error_name
     except Exception as e:
         logging.error(f"Error in get_superchats: {str(e)}")
         raise  # This will trigger the retry
@@ -103,6 +107,15 @@ def update_for_each_video(youtuber_info, video):
         yt_url = f'https://www.youtube.com/watch?v={video["id"]}'
         time.sleep(30)
         all_supporters_info, video_total_earning = get_superchats_with_retry(yt_url)
+        if all_supporters_info == None:
+            error_name = video_total_earning
+            db.collection("youtubers").document(youtuber_info['youtuber_id']).set({
+                'unnecessaryVideoIds': firestore.ArrayUnion([{
+                    'id': video['id'],
+                    'error': error_name
+                }])
+            }, merge=True)
+            return
         video_info['video_total_earning'] = video_total_earning
         update_doc(youtuber_info, video_info, all_supporters_info)
     except RetryError as e:
@@ -182,7 +195,9 @@ def set_youtuber_superChats(youtubers):
             
             for vid_id in video_ids:
                 youtuber_doc = db.collection("youtubers").document(youtuber_info['youtuber_id']).get().to_dict()
-                if youtuber_doc is None or vid_id not in youtuber_doc.get('videoIds', []):
+                processed_video_ids = youtuber_doc.get('videoIds', [])
+                unnecessary_video_ids = [item['id'] for item in youtuber_doc.get('unnecessaryVideoIds', [])]
+                if youtuber_doc is None or vid_id not in (processed_video_ids + unnecessary_video_ids):
                     vid_info = youtube_api.get_video_details(vid_id)
                     if vid_info.get('liveStreamingDetails') is None or vid_info['snippet']['liveBroadcastContent'] == 'live' or vid_info['liveStreamingDetails'].get('actualEndTime') is None:
                         logging.info(f"{youtuber_name}'s video: {vid_id} is not live streaming, or still onlive")
@@ -197,40 +212,40 @@ def set_youtuber_superChats(youtubers):
         sys.exit(1)  # スクリプトを終了
 
 # @tasks_blueprint.route('/tasks/update_youtubers', methods=['GET'])
-def update_youtubers():
-    youtubers_docs = db.collection('youtubers').stream()
-    for youtuber in youtubers_docs:
-        today = datetime.today() - timedelta(days=5)
-        youtuber_info, video_ids = youtube_api.get_videos_until_date(youtuber.id, today.year, today.month, today.day)
-        all_vid_infos = youtube_api.process_videos(video_ids)
-        for vid in all_vid_infos:
-            if vid.get('liveStreamingDetails') == None or vid['snippet']['liveBroadcastContent'] == 'live' or vid['liveStreamingDetails'].get('actualEndTime') == None:
-                continue
-            update_for_each_video(youtuber_info, vid)
-    return {"success": True}
+# def update_youtubers():
+#     youtubers_docs = db.collection('youtubers').stream()
+#     for youtuber in youtubers_docs:
+#         today = datetime.today() - timedelta(days=5)
+#         youtuber_info, video_ids = youtube_api.get_videos_until_date(youtuber.id, today.year, today.month, today.day)
+#         all_vid_infos = youtube_api.process_videos(video_ids)
+#         for vid in all_vid_infos:
+#             if vid.get('liveStreamingDetails') == None or vid['snippet']['liveBroadcastContent'] == 'live' or vid['liveStreamingDetails'].get('actualEndTime') == None:
+#                 continue
+#             update_for_each_video(youtuber_info, vid)
+#     return {"success": True}
 
-@tasks_blueprint.route('/admin/manual_update', methods=['POST'])
-def manual_update():
-    if not authenticate_admin(request):
-        abort(401)
-    pass
+# @tasks_blueprint.route('/admin/manual_update', methods=['POST'])
+# def manual_update():
+#     if not authenticate_admin(request):
+#         abort(401)
+#     pass
 
-def authenticate_admin(request):
-    auth_header = request.headers.get('Authorization')
-    if not auth_header:
-        return False
+# def authenticate_admin(request):
+#     auth_header = request.headers.get('Authorization')
+#     if not auth_header:
+#         return False
 
-    import base64
-    try:
-        auth_decoded = base64.b64decode(auth_header.split()[1]).decode('utf-8')
-        username, password = auth_decoded.split(':')
-    except (IndexError, ValueError):
-        return False
+#     import base64
+#     try:
+#         auth_decoded = base64.b64decode(auth_header.split()[1]).decode('utf-8')
+#         username, password = auth_decoded.split(':')
+#     except (IndexError, ValueError):
+#         return False
 
-    if username != ADMIN_USERNAME:
-        return False
+#     if username != ADMIN_USERNAME:
+#         return False
 
-    password_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
-    expected_hash = hashlib.sha256(ADMIN_PASSWORD.encode('utf-8')).hexdigest()
+#     password_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
+#     expected_hash = hashlib.sha256(ADMIN_PASSWORD.encode('utf-8')).hexdigest()
 
-    return hmac.compare_digest(password_hash, expected_hash)
+#     return hmac.compare_digest(password_hash, expected_hash)

@@ -41,7 +41,10 @@ export default function TabNavigation({ selectedMonth, setSelectedMonth, setShow
             role="tab" 
             aria-controls="profile-tab-pane" 
             aria-selected={showYear}
-            onClick={() => setShowYear(true)}
+            onClick={() => 
+              {
+                setShowYear(true);
+              }}
           >
             {year}
           </button>
