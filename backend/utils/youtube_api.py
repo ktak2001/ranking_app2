@@ -1,7 +1,7 @@
 import requests
 from config import YOUTUBE_API_KEY
 from chat_downloader import ChatDownloader
-from utils.common import get_currency_json
+from utils.common import get_currency_json, pretty_json
 import logging
 
 class YouTubeAPI:
@@ -92,3 +92,13 @@ class YouTubeAPI:
         else:
           res[supporter_id]['amount'] += jpn_msg
     return res, total_superchat_earnings
+  
+  def test_get_superchats(self, url):
+    try:
+      chat = ChatDownloader().get_chat(url, message_groups=["superchat"])
+    except Exception as err:
+      logging.error(f"error: {err=}")
+      raise
+    for i, message in enumerate(chat):
+      if message['message_type'] == 'paid_message' or message['message_type'] == 'paid_sticker':
+          print(f"{i}: {pretty_json(message)}")

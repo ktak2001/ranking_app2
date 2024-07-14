@@ -1,4 +1,4 @@
-import YoutuberDetailsClient from './YoutuberDetailsClient';
+import YoutuberDetailsClient from './YoutuberDetailsClient.js';
 import { getYoutuberInfo, getSupportersRanking } from '@/app/lib/api';
 import { yearMonth } from "@/app/lib/useful.js";
 

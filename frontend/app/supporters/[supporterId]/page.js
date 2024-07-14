@@ -1,4 +1,4 @@
-import SupporterDetailsClient from './SupporterDetailsClient';
+import SupporterDetailsClient from './SupporterDetailsClient.js';
 import { getSupporterInfo } from '@/app/lib/api';
 
 // Simple in-memory cache

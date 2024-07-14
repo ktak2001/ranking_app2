@@ -13,6 +13,7 @@ export default function ClientHome({ initialYoutubers, year, month }) {
   const allMonthArr = Array.from({length: parseInt(month) - 3}, (_, i) => String(parseInt(month) - i).padStart(2, '0'));
   useEffect(() => {
     if (showYear || currentMonth !== selectedMonth) {
+      console.log("inside useEffect", "showYear: ", showYear, "currentMonth: ", currentMonth, "selectedMonth: ", selectedMonth)
       getYoutubersRanking(year, selectedMonth, showYear)
         .then(data => {
           setYoutubers(data)

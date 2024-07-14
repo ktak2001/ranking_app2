@@ -1,3 +1,4 @@
+import google.cloud.logging
 from config import YOUTUBE_API_KEY, STRIPE_API_KEY, db, WEB_URL, IS_CLOUD_RUN
 from utils.common import pretty_json, getFilePath, read_from_json_file, write_into_file, get_currency_json, update_one_supporter
 import numpy as np
@@ -17,6 +18,11 @@ import functools
 import time
 import threading
 
+
+
+client = google.cloud.logging.Client()
+client.setup_logging()
+
 app = Flask(__name__)
 CORS(app)
 app.register_blueprint(tasks_blueprint)
@@ -35,15 +41,17 @@ def cache_with_persistence(ttl_minutes=30):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             cache_key = f"{func.__name__}:{args}:{kwargs}"
-            
+            logging.info(f"inside cache_with_persistence")
             if not IS_CLOUD_RUN:
                 # Cloud Run以外の環境では、キャッシュを使用せずに直接関数を実行
+                logging.info(f"not IS_CLOUD_RUN")
                 return func(*args, **kwargs)
             
             with cache_lock:
                 if cache_key in cache:
                     result, timestamp = cache[cache_key]
                     if datetime.now() - timestamp < timedelta(minutes=ttl_minutes):
+                        logging.info(f"used Cache in Server")
                         return result
             
             doc_ref = db.collection('cache').document(cache_key)
@@ -54,6 +62,7 @@ def cache_with_persistence(ttl_minutes=30):
                 if datetime.now() - cached_data['timestamp'].replace(tzinfo=None) < timedelta(minutes=ttl_minutes):
                     with cache_lock:
                         cache[cache_key] = (cached_data['result'], cached_data['timestamp'])
+                    logging.info(f"used Cache in FireStore")
                     return cached_data['result']
             
             result = func(*args, **kwargs)
@@ -155,6 +164,7 @@ def getYoutubersRanking():
     showYear = data['showYear']
     year = '_' + data['year']
     month = '_' + data['month']
+    logging.info(f"getting youtubers ranking")
     return get_youtubers_ranking(year, month, showYear)
 
 @cache_with_persistence()
@@ -162,6 +172,7 @@ def get_youtubers_ranking(year, month, showYear):
     youtubers_docs = db.collection('youtubers').stream()
     ranking_list = []
     print(f"showYear: {showYear}")
+    logging.info(f"showYear: {showYear}")
 
     for youtuber_doc in youtubers_docs:
         youtuber = youtuber_doc.to_dict()
@@ -189,6 +200,7 @@ def get_youtubers_ranking(year, month, showYear):
 
 @app.route("/api/getSupportersRanking", methods=["POST"])
 def getSupporterRanking():
+    print("inside supporterRanking")
     data = request.get_json()
     _year = '_'+ data['year']
     _month = '_'+ data['month']
@@ -359,48 +371,48 @@ def create_account_link():
     except Exception as e:
         return jsonify(error=str(e)), 403
 
-@app.route('/api/webhook', methods=['POST'])
-def stripe_webhook():
-    payload = request.get_data(as_text=True)
-    sig_header = request.headers.get('Stripe-Signature')
-    endpoint_secret = os.environ.get('STRIPE_ENDPOINT_SECRET')
+# @app.route('/api/webhook', methods=['POST'])
+# def stripe_webhook():
+#     payload = request.get_data(as_text=True)
+#     sig_header = request.headers.get('Stripe-Signature')
+#     endpoint_secret = os.environ.get('STRIPE_ENDPOINT_SECRET')
 
-    try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, endpoint_secret
-        )
-    except ValueError as e:
-        return jsonify(success=False), 400
-    except stripe.error.SignatureVerificationError as e:
-        return jsonify(success=False), 400
+#     try:
+#         event = stripe.Webhook.construct_event(
+#             payload, sig_header, endpoint_secret
+#         )
+#     except ValueError as e:
+#         return jsonify(success=False), 400
+#     except stripe.error.SignatureVerificationError as e:
+#         return jsonify(success=False), 400
 
-    event_dict = stripe.util.convert_to_dict(event)
+#     event_dict = stripe.util.convert_to_dict(event)
 
-    if event_dict['type'] == 'payment_intent.succeeded':
-        print("event", event_dict)
-        session = event_dict['data']['object']
-        youtuber_id = session['metadata']['youtuberId']
-        supporter_id = session['metadata']['supporterId']
-        created = event_dict['created']
-        year = '_' + datetime.utcfromtimestamp(created).strftime("%Y")
-        month = '_' + datetime.utcfromtimestamp(created).strftime("%m")
-        new_amount = session['amount_received']
-        print(datetime.utcfromtimestamp(created).strftime("_%Y_%m"))
-        supporter_data = db.collection('supporters').document(supporter_id).get().to_dict()
-        update_one_supporter(supporter_data, year, month, new_amount, youtuber_id)
-        youtuber_ref = db.collection('youtubers').document(youtuber_id)
-        youtuber_ref.set({
-            "totalAmount": firestore.Increment(new_amount)
-        }, merge=True)
-        youtuber_summary_year_ref = youtuber_ref.collection("summary").document(year)
-        youtuber_summary_year_ref.set({
-            "totalAmount": firestore.Increment(new_amount),
-            "monthlyAmount": {
-                month: firestore.Increment(new_amount)
-            }
-        }, merge=True)
+#     if event_dict['type'] == 'payment_intent.succeeded':
+#         print("event", event_dict)
+#         session = event_dict['data']['object']
+#         youtuber_id = session['metadata']['youtuberId']
+#         supporter_id = session['metadata']['supporterId']
+#         created = event_dict['created']
+#         year = '_' + datetime.utcfromtimestamp(created).strftime("%Y")
+#         month = '_' + datetime.utcfromtimestamp(created).strftime("%m")
+#         new_amount = session['amount_received']
+#         print(datetime.utcfromtimestamp(created).strftime("_%Y_%m"))
+#         supporter_data = db.collection('supporters').document(supporter_id).get().to_dict()
+#         update_one_supporter(supporter_data, year, month, new_amount, youtuber_id)
+#         youtuber_ref = db.collection('youtubers').document(youtuber_id)
+#         youtuber_ref.set({
+#             "totalAmount": firestore.Increment(new_amount)
+#         }, merge=True)
+#         youtuber_summary_year_ref = youtuber_ref.collection("summary").document(year)
+#         youtuber_summary_year_ref.set({
+#             "totalAmount": firestore.Increment(new_amount),
+#             "monthlyAmount": {
+#                 month: firestore.Increment(new_amount)
+#             }
+#         }, merge=True)
 
-    return jsonify(success=True), 200
+#     return jsonify(success=True), 200
 
 @app.route('/api/createCheckoutSession', methods=['POST'])
 def create_checkout_session():
@@ -444,4 +456,5 @@ def create_checkout_session():
     return redirect(checkout_session.url, code=303)
 
 if __name__ == "__main__":
-    app.run(port=8000, debug=True)
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)

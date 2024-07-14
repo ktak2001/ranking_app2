@@ -1,21 +1,23 @@
 steps:
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/backend', '.']
+    args: ['build', '-t', 'gcr.io/ranking-app-bf2df/backend', '.']
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/backend']
-  # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  #   entrypoint: gcloud
-  #   args:
-  #     - 'run'
-  #     - 'deploy'
-  #     - 'backend'
-  #     - '--image'
-  #     - 'gcr.io/$PROJECT_ID/backend'
-  #     - '--region'
-  #     - 'asia-northeast1'
-  #     - '--platform'
-  #     - 'managed'
-  #     - '--set-env-vars'
-  #     - 'WEB_URL=$WEB_URL,FLASK_ENV=$FLASK_ENV,GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT,ADMIN_USERNAME=$ADMIN_USERNAME,ADMIN_PASSWORD=$ADMIN_PASSWORD,YOUTUBE_API_KEY=$YOUTUBE_API_KEY,STRIPE_API_KEY=$STRIPE_API_KEY'
+    args: ['push', 'gcr.io/ranking-app-bf2df/backend']
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'backend'
+      - '--image'
+      - 'gcr.io/ranking-app-bf2df/backend'
+      - '--region'
+      - 'asia-northeast1'
+      - '--platform'
+      - 'managed'
+      - '--set-env-vars'
+      - 'WEB_URL=https://ranking-app-bf2df.firebaseapp.com,GOOGLE_CLOUD_PROJECT=ranking-app-bf2df,ENVIRONMENT=production'
+      - '--set-secrets'
+      - 'FIREBASE_CREDENTIALS=FIREBASE_CREDENTIALS:latest,YOUTUBE_API_KEY=YOUTUBE_API_KEY:latest,STRIPE_API_KEY=STRIPE_API_KEY:latest'
 images:
-  - 'gcr.io/$PROJECT_ID/backend'
+  - 'gcr.io/ranking-app-bf2df/backend'
