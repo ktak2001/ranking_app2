@@ -17,6 +17,7 @@ from admin_tasks import tasks_blueprint
 import functools
 import time
 import threading
+import pytz
 
 
 
@@ -43,14 +44,15 @@ def cache_with_persistence(ttl_minutes=30):
             cache_key = f"{func.__name__}:{args}:{kwargs}"
             logging.info(f"inside cache_with_persistence")
             if not IS_CLOUD_RUN:
-                # Cloud Run以外の環境では、キャッシュを使用せずに直接関数を実行
                 logging.info(f"not IS_CLOUD_RUN")
                 return func(*args, **kwargs)
             
             with cache_lock:
                 if cache_key in cache:
                     result, timestamp = cache[cache_key]
-                    if datetime.now() - timestamp < timedelta(minutes=ttl_minutes):
+                    # タイムゾーンを統一して比較
+                    now = datetime.now(pytz.UTC)
+                    if now - timestamp < timedelta(minutes=ttl_minutes):
                         logging.info(f"used Cache in Server")
                         return result
             
@@ -59,7 +61,9 @@ def cache_with_persistence(ttl_minutes=30):
             
             if doc.exists:
                 cached_data = doc.to_dict()
-                if datetime.now() - cached_data['timestamp'].replace(tzinfo=None) < timedelta(minutes=ttl_minutes):
+                # タイムゾーンを統一して比較
+                now = datetime.now(pytz.UTC)
+                if now - cached_data['timestamp'].replace(tzinfo=pytz.UTC) < timedelta(minutes=ttl_minutes):
                     with cache_lock:
                         cache[cache_key] = (cached_data['result'], cached_data['timestamp'])
                     logging.info(f"used Cache in FireStore")
@@ -67,12 +71,14 @@ def cache_with_persistence(ttl_minutes=30):
             
             result = func(*args, **kwargs)
             
+            # タイムゾーン付きの現在時刻を使用
+            now = datetime.now(pytz.UTC)
             with cache_lock:
-                cache[cache_key] = (result, datetime.now())
+                cache[cache_key] = (result, now)
             
             doc_ref.set({
                 'result': result,
-                'timestamp': datetime.now()
+                'timestamp': now
             })
             
             return result
@@ -87,7 +93,7 @@ def persist_cache():
         
         with cache_lock:
             for key, (value, timestamp) in cache.items():
-                if datetime.now() - timestamp < timedelta(minutes=30):
+                if datetime.now(pytz.UTC) - timestamp < timedelta(minutes=30):
                     db.collection('cache').document(key).set({
                         'result': value,
                         'timestamp': timestamp

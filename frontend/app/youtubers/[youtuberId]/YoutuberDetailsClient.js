@@ -53,7 +53,7 @@ export default function YoutuberDetailsClient({ initialData, params }) {
         <div>
           <h1 style={{ margin: 0 }}>{youtuberInfo.youtuberName}</h1>
           <a href={youtuberChannelUrl} target="_blank" rel="noopener noreferrer">
-            <button className="btn btn-outline-primary" style={{ marginTop: '5px' }}>Youtubeチャンネル</button>
+            <button className="btn btn-outline-primary" style={{ marginTop: '5px' }}>YouTubeチャンネル</button>
           </a>
         </div>
         {
