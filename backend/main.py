@@ -220,10 +220,10 @@ def get_supporters_ranking(_year, _month, youtuberId, showYear):
   youtuberName = (youtuber_ref.get().to_dict())['youtuberName']
   if showYear:
     total_amount = (youtuber_ref.collection('summary').document(_year).get().to_dict()).get('totalAmount', 0)
-    youtuber_supporter_list = youtuber_ref.collection('supporters').order_by(f"yearlyAmount.{_year}", direction=firestore.Query.DESCENDING).limit(30).stream()
+    youtuber_supporter_list = youtuber_ref.collection('supporters').order_by(f"yearlyAmount.{_year}", direction=firestore.Query.DESCENDING).limit(100).stream()
   else:
     total_amount = (youtuber_ref.collection('summary').document(_year).get().to_dict()).get('monthlyAmount', {}).get(_month, 0)
-    youtuber_supporter_list = youtuber_ref.collection('supporters').order_by(f"monthlyAmount.{_year}{_month}", direction=firestore.Query.DESCENDING).limit(30).stream()
+    youtuber_supporter_list = youtuber_ref.collection('supporters').order_by(f"monthlyAmount.{_year}{_month}", direction=firestore.Query.DESCENDING).limit(100).stream()
   top_supporters = []
   for supporter in youtuber_supporter_list:
     supporter_data = supporter.to_dict()

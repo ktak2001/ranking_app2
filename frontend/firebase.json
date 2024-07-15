@@ -11,7 +11,7 @@
     },
     "environment": {
       "NEXT_PUBLIC_API_URL": "https://backend-io2redkura-an.a.run.app/api",
-      "NEXT_PUBLIC_WEB_URL": "https://ranking-app-bf2df.firebaseapp.com"
+      "NEXT_PUBLIC_WEB_URL": "https://virtual-youtuber-nagesen.com"
     }
   }
 }

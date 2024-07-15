@@ -10,6 +10,9 @@ import Link from "next/link.js";
 
 export default function YoutubeRegisterSuccess() {
   const [waiting, setWaiting] = useState(true)
+  const [success, setSuccess] = useState(false)
+  const [fail, setFail] = useState(false)
+  const [failedMessage, setFailedMessage] = useState("Fail")
   const user = useAuth()
   const router = useRouter()
 
@@ -22,16 +25,23 @@ export default function YoutubeRegisterSuccess() {
       })
         .then(res => {
           console.log("res in YoutubeLogin", res)
-          const supporterId = res.data.items[0].id
-          const ref = doc(db, `users/${user.id}`);
-          axios.post(`${process.env.NEXT_PUBLIC_API_URL}/connectUserToSupporter`,
-          { userId: user.id, supporterId }, {
-            headers:{
-              "Content-Type": "application/json"
-            }
-          }).then(_ => {
-            updateDoc(ref, {supporterId})
-            setWaiting(false)})
+          if (!res.data.items || res.data.items.length === 0) {
+            console.error("Failed to retrieve channel data");
+            setFailedMessage("選んだGmailアドレスに基づくYouTubeチャンネルは存在しません")
+            setWaiting(false);
+            setFail(true);
+          } else {
+            const supporterId = res.data.items[0].id
+            const ref = doc(db, `users/${user.id}`);
+            axios.post(`${process.env.NEXT_PUBLIC_API_URL}/connectUserToSupporter`,
+            { userId: user.id, supporterId }, {
+              headers:{
+                "Content-Type": "application/json"
+              }
+            }).then(_ => {
+              updateDoc(ref, {supporterId})
+              setWaiting(false)})
+          }
         })
     } else {
       console.log("failed2", tmpParams)
@@ -54,6 +64,8 @@ export default function YoutubeRegisterSuccess() {
           getAccount(params)
         } else {
           console.log('State mismatch. Possible CSRF attack');
+          setFail(true)
+          setWaiting(false)
         }
       }
     }
@@ -61,14 +73,22 @@ export default function YoutubeRegisterSuccess() {
 
   return (
     <div>
-      {waiting == true && <div>loading...</div>}
-      {waiting == false && 
+      {waiting && <div>loading...</div>}
+      {!waiting && success &&
       <div>
         <div>success</div>
         <a href={'/'} >
           Go Home
         </a>
       </div>
+      }
+      {!waiting && fail && 
+          <div>
+            <div>{failedMessage}</div>
+            <a href={'/'} >
+              Go Home
+            </a>
+          </div>
       }
     </div>
   )
