@@ -143,16 +143,6 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
     is_processing = processing_youtubers_video_doc.exists
     processing_youtubers_video_data = processing_youtubers_video_doc.to_dict() if is_processing else {}
     youtuber_ref = db.collection("youtubers").document(youtuber_id)
-    youtuber_doc = youtuber_ref.get()
-    if not youtuber_doc.exists:
-        youtuber_ref.set({
-            "youtuberName": youtuber_name,
-            "totalAmount": 0,
-            "youtuberId": youtuber_id,
-            "videoIds": [],
-            "youtuberIconUrl": youtuber_icon_url,
-            "youtuberCustomUrl": youtuber_custom_url
-        })
     logger.info(f"is_processing: {is_processing}, {youtuber_id}, {video_id}")
     if not is_processing:
         youtuber_ref.set({
@@ -197,13 +187,33 @@ def set_youtuber_superChats(youtubers):
             
             youtuber_info, video_ids = youtube_api.get_videos_until_date(youtuber_id, 2024, 3, 31)
             logger.info(f"Retrieved {len(video_ids)} videos for {youtuber_name}")
-            youtuber_doc = db.collection("youtubers").document(youtuber_info['youtuber_id']).get()
+            youtuber_id, youtuber_name, youtuber_icon_url, youtuber_custom_url = (
+                youtuber_info[k] for k in ('youtuber_id', 'youtuber_name', 'youtuber_icon_url', 'youtuber_custom_url')
+            )
+            youtuber_ref = db.collection("youtubers").document(youtuber_id)
+            youtuber_doc = youtuber_ref.get()
             if not youtuber_doc.exists:
+                youtuber_ref.set({
+                    "youtuberName": youtuber_name,
+                    "totalAmount": 0,
+                    "youtuberId": youtuber_id,
+                    "videoIds": [],
+                    "youtuberIconUrl": youtuber_icon_url,
+                    "youtuberCustomUrl": youtuber_custom_url
+                }, merge=True)
                 youtuber_data = None
             else:
+                youtuber_ref.set({
+                    "youtuberName": youtuber_name,
+                    "youtuberId": youtuber_id,
+                    "youtuberIconUrl": youtuber_icon_url,
+                    "youtuberCustomUrl": youtuber_custom_url
+                }, merge=True)
+                # 後で上の行消す
                 youtuber_data = youtuber_doc.to_dict()
             processed_video_ids = youtuber_data.get('videoIds', []) if youtuber_data is not None else []
             unnecessary_video_ids = [item['id'] for item in youtuber_data.get('unnecessaryVideoIds', [])] if youtuber_data is not None else []
+
 
             for vid_id in video_ids:
                 if youtuber_data is None or vid_id not in (processed_video_ids + unnecessary_video_ids):

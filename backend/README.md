@@ -18,9 +18,10 @@ export PROJECT_ID=ranking-app-bf2df
 
 ## Deployment Script
 
-## Deployment Using Cloud Build
-
-To deploy the backend service using Cloud Build, execute the following command:
+```bash
+# just execute this command
+gcloud builds submit --config cloudbuild.yaml
+```
 
 Save the following script as `deploy.sh` in your backend directory:
 
