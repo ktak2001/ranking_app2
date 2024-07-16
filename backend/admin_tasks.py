@@ -185,7 +185,7 @@ def set_youtuber_superChats(youtubers):
                 continue
             logger.info(f"Processing youtuber: {youtuber_name} ({youtuber_id})")
             
-            youtuber_info, video_ids = youtube_api.get_videos_until_date(youtuber_id, 2024, 3, 31)
+            youtuber_info, video_ids = youtube_api.get_videos_until_date(youtuber_id, 2023, 12, 31)
             logger.info(f"Retrieved {len(video_ids)} videos for {youtuber_name}")
             youtuber_id, youtuber_name, youtuber_icon_url, youtuber_custom_url = (
                 youtuber_info[k] for k in ('youtuber_id', 'youtuber_name', 'youtuber_icon_url', 'youtuber_custom_url')

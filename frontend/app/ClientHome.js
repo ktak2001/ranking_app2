@@ -31,6 +31,23 @@ export default function ClientHome({ initialYoutubers, year, month }) {
         year={year}
         showYear={showYear}
       />
+      <div className="d-flex flex-column align-items-end mb-3 me-3">
+        <p className="mb-2">改善してほしいことがあればなんでも送ってください。</p>
+        <div>
+          <button 
+            onClick={() => {
+              navigator.clipboard.writeText('vtuber.nagesen.ranking@gmail.com');
+              alert('メールアドレスをコピーしました');
+            }} 
+            className="btn btn-outline-secondary btn-sm me-2"
+          >
+            メール: vtuber.nagesen.ranking@gmail.com
+          </button>
+          <a href="https://twitter.com/vtuber_nagesen" target="_blank" rel="noopener noreferrer" className="btn btn-outline-primary btn-sm">
+            Twitter: @vtuber_nagesen
+          </a>
+        </div>
+      </div>
       <div className="container text-center">
         <div className="row">
           {youtubers.map(youtuber => (

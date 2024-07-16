@@ -113,7 +113,7 @@ export default function Header() {
   const handleHomeClick = (e) => {
     e.preventDefault();
     if (pathname === "/") {
-      router.refresh();
+      window.location.reload()
     } else {
       router.push("/");
     }
