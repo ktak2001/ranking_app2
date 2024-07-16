@@ -13,7 +13,7 @@ export default function TabNavigation({ selectedMonth, setSelectedMonth, setShow
             role="button" 
             aria-expanded="false"
           >
-            {selectedMonth}
+            {selectedMonth[0]=="0" ? selectedMonth[1] : selectedMonth}月
           </button>
           <ul className="dropdown-menu">
             {allMonthArr.map(el => (
@@ -25,7 +25,7 @@ export default function TabNavigation({ selectedMonth, setSelectedMonth, setShow
                     setShowYear(false); 
                   }}
                 >
-                  {el}
+                  {el[0]=='0' ? el[1] : el}月
                 </button>
               </li>
             ))}
@@ -46,7 +46,7 @@ export default function TabNavigation({ selectedMonth, setSelectedMonth, setShow
                 setShowYear(true);
               }}
           >
-            {year}
+            {year}年
           </button>
         </li>
       </ul>

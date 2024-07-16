@@ -19,10 +19,7 @@ import time
 import threading
 import pytz
 
-
-
-client = google.cloud.logging.Client()
-client.setup_logging()
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
 CORS(app)
@@ -32,12 +29,14 @@ stripe.api_key = STRIPE_API_KEY
 if IS_CLOUD_RUN:
     cache = {}
     cache_lock = threading.Lock()
+    client = google.cloud.logging.Client()
+    client.setup_logging()
 else:
     cache = None
     cache_lock = None
 
 
-def cache_with_persistence(ttl_minutes=30):
+def cache_with_persistence(ttl_minutes=60*12):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -87,7 +86,7 @@ def cache_with_persistence(ttl_minutes=30):
 
 def persist_cache():
     while True:
-        time.sleep(3600)  # 1時間ごとに永続化
+        time.sleep(60*60*6)  # 1時間ごとに永続化
         if not IS_CLOUD_RUN:
             return  # Cloud Run以外の環境では永続化を行わない
         
@@ -177,19 +176,19 @@ def getYoutubersRanking():
 def get_youtubers_ranking(year, month, showYear):
     youtubers_docs = db.collection('youtubers').stream()
     ranking_list = []
-    print(f"showYear: {showYear}")
     logging.info(f"showYear: {showYear}")
 
     for youtuber_doc in youtubers_docs:
         youtuber = youtuber_doc.to_dict()
-        youtuber_doc = db.collection('youtubers').document(youtuber_doc.id).collection('summary').document(year).get()
+        # print("youtuber", pretty_json(youtuber))
+        youtuber_summary_doc = db.collection('youtubers').document(youtuber['youtuberId']).collection('summary').document(year).get()
         
-        if not youtuber_doc.exists:
+        if not youtuber_summary_doc.exists:
             continue
         if showYear:
-          amount = (youtuber_doc.to_dict()).get('totalAmount', 0)
+          amount = (youtuber_summary_doc.to_dict()).get('totalAmount', 0)
         else:
-          amount = (youtuber_doc.to_dict()).get('monthlyAmount', {}).get(month, 0)
+          amount = (youtuber_summary_doc.to_dict()).get('monthlyAmount', {}).get(month, 0)
         
         if amount == 0:
             continue
@@ -205,7 +204,7 @@ def get_youtubers_ranking(year, month, showYear):
     return sorted_ranking
 
 @app.route("/api/getSupportersRanking", methods=["POST"])
-def getSupporterRanking():
+def getSupportersRanking():
     print("inside supporterRanking")
     data = request.get_json()
     _year = '_'+ data['year']
@@ -213,6 +212,31 @@ def getSupporterRanking():
     youtuberId = data['youtuberId']
     showYear = data['showYear']
     return get_supporters_ranking(_year, _month, youtuberId, showYear)
+
+@app.route("/api/getAllSupportersRanking", methods=["POST"])
+def getAllSupportersRanking():
+    print("inside all supportersRanking")
+    data = request.get_json()
+    _year = '_'+ data['year']
+    _month = '_'+ data['month']
+    showYear = data['showYear']
+    return get_all_supporters_ranking(_year, _month, showYear)
+
+@cache_with_persistence()
+def get_all_supporters_ranking(_year, _month, showYear):
+    youtubers_docs = db.collection('youtubers').stream()
+    top_supporters = []
+    for youtuber_doc in youtubers_docs:
+        youtuber = youtuber_doc.to_dict()
+        supporters = get_supporters_ranking(_year, _month, youtuber['youtuberId'], showYear)
+        for supporter in supporters['top_supporters']:
+            supporter['youtuberId'] = youtuber['youtuberId']
+            supporter['youtuberIconUrl'] = youtuber['youtuberIconUrl']
+            supporter['youtuberName'] = youtuber['youtuberName']
+            supporter['youtuberCustomUrl'] = youtuber['youtuberCustomUrl']
+            top_supporters.append(supporter)
+    sorted_top_supporters = sorted(top_supporters, key=lambda x: x['amount'], reverse=True)
+    return sorted_top_supporters[:100]
 
 @cache_with_persistence()
 def get_supporters_ranking(_year, _month, youtuberId, showYear):
@@ -462,5 +486,5 @@ def create_checkout_session():
     return redirect(checkout_session.url, code=303)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 8000))
     app.run(host='0.0.0.0', port=port)

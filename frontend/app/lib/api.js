@@ -25,6 +25,11 @@ export async function getSupportersRanking(year, month, youtuberId, showYear) {
   return response.data;
 }
 
+export async function getAllSupportersRanking(year, month, showYear) {
+  const response = await axiosInstance.post(`/getAllSupportersRanking`, { year, month, showYear });
+  return response.data;
+}
+
 export async function getYoutubersRanking(year, month, showYear) {
   const response = await axiosInstance.post(`/getYoutubersRanking`, { year, month, showYear });
   return response.data;
