@@ -16,6 +16,14 @@ Set your project ID:
 export PROJECT_ID=ranking-app-bf2df
 ```
 
+## Developing
+
+When new module is imported, always run the following command to install the module to the `requirements.txt` file:
+
+```bash
+pip3 freeze > requirements.txt
+```
+
 ## Deployment Script
 
 ```bash

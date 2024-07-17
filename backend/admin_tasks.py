@@ -42,6 +42,8 @@ def get_supporter_custom_url(supporter_id):
     data = response.json()
     if 'items' in data and len(data['items']) > 0:
         return data['items'][0]['snippet'].get('customUrl', '@')
+    else:
+        logger.error(f"items not found in data, or no customUrl for supporter_id: {supporter_id}")
     return '@'
 
 def update_supporter(supporter, _year, _month, amount, youtuber_id, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing):
@@ -53,7 +55,7 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, processing_y
         youtuber_supporter_ref = db.collection('youtubers').document(youtuber_id).collection('supporters').document(supporter_id)
         supporter_ref = db.collection("supporters").document(supporter_id)
         supporter_doc = supporter_ref.get()
-        
+        logger.info(f"updating supporter {supporter_id} for youtuber {youtuber_id}")
         if not supporter_doc.exists:
             supporter_custom_url = get_supporter_custom_url(supporter_id)
         else:
@@ -143,7 +145,7 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
     is_processing = processing_youtubers_video_doc.exists
     processing_youtubers_video_data = processing_youtubers_video_doc.to_dict() if is_processing else {}
     youtuber_ref = db.collection("youtubers").document(youtuber_id)
-    logger.info(f"is_processing: {is_processing}, {youtuber_id}, {video_id}")
+    logger.info(f"is_processing: {is_processing}, youtuber_id: {youtuber_id}, video_id: {video_id}")
     if not is_processing:
         youtuber_ref.set({
             "totalAmount": firestore.Increment(video_total_earning)
@@ -153,7 +155,7 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
             "youtuberSupporterRef": [],
             "supporterRef": []
         })
-        logger.info(f"set is_processing, {youtuber_id}, {video_id}")
+        logger.info(f"set is_processing, youtuber_id: {youtuber_id}, video_id: {video_id}")
     if not is_processing or not processing_youtubers_video_data.get("summary", False):
         youtuber_summary_year_ref = youtuber_ref.collection("summary").document(_year)
         youtuber_summary_year_ref.set({
@@ -174,6 +176,7 @@ def update_doc(youtuber_info, video_info, all_supporters_info):
         "processed": firestore.ArrayUnion([video_id])
     }, merge=True)
     processing_youtubers_video_ref.delete()
+    logger.info(f"finished updating doc for video {video_id}")
 
 def set_youtuber_superChats(youtubers):
     try:
@@ -226,6 +229,9 @@ def set_youtuber_superChats(youtubers):
                 else:
                     logger.info(f"{youtuber_name}'s video: {vid_id} was already processed")
         return {"success": True}
+    except KeyError as e:
+        logger.error(f"KeyError in set_youtuber_superChats: {str(e)}")
+        sys.exit(1)
     except Exception as e:
         logger.error(f"Critical error in set_youtuber_superChats: {str(e)}")
         sys.exit(1)  # スクリプトを終了
