@@ -55,7 +55,7 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, processing_y
         youtuber_supporter_ref = db.collection('youtubers').document(youtuber_id).collection('supporters').document(supporter_id)
         supporter_ref = db.collection("supporters").document(supporter_id)
         supporter_doc = supporter_ref.get()
-        logger.info(f"updating supporter {supporter_id} for youtuber {youtuber_id}")
+        # logger.info(f"updating supporter {supporter_id} for youtuber {youtuber_id}")
         if not supporter_doc.exists:
             supporter_custom_url = get_supporter_custom_url(supporter_id)
         else:
