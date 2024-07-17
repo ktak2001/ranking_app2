@@ -31,7 +31,7 @@ def init():
     except Exception as e:
         logger.error(f"Error reading CSV file: {str(e)}")
         return
-    set_youtuber_superChats(youtubers[6:])
+    set_youtuber_superChats(youtubers[9:])
 
 if __name__ == "__main__":
     try:
