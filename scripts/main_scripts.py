@@ -14,7 +14,6 @@ import os
 import stripe
 from datetime import datetime
 # This is your test secret API key.
-stripe.api_key = 'sk_test_51PT5PZP0X4ULjrnYVP2u3Y486mMIgHYFokN2D66nSTBaJ0yTvmobKZpEuqIWNfHxoNie4czbZ355v0NuOoDd9ZIT00F3AVuBn6'
 
 # Use a service account.
 cred = credentials.Certificate('/Users/takehikazuki/Desktop/my_app3/ranking_app/scripts/ranking-app-bf2df-firebase-adminsdk-vtb8n-d6b04bb9a6.json')
@@ -26,8 +25,6 @@ db = firestore.client()
 app = Flask(__name__)
 CORS(app)
 
-YOUTUBE_API_KEY = "AIzaSyCSSs-bibdX20lkrtb2Dhby8xYSsMPVYFM"
-STRIPE_API_KEY = "sk_test_51PT5PZP0X4ULjrnYVP2u3Y486mMIgHYFokN2D66nSTBaJ0yTvmobKZpEuqIWNfHxoNie4czbZ355v0NuOoDd9ZIT00F3AVuBn6"
 
 def pretty_json(data):
   return json.dumps(data, indent = 4, ensure_ascii=False)
