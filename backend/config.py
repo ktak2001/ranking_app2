@@ -43,6 +43,7 @@ def initialize_firebase():
         firebase_creds_json = access_secret_version(GOOGLE_CLOUD_PROJECT, "FIREBASE_CREDENTIALS")
         cred = credentials.Certificate(json.loads(firebase_creds_json))
     else:
+        print(os.getenv('GOOGLE_APPLICATION_CREDENTIALS'))
         cred = credentials.Certificate(os.getenv('GOOGLE_APPLICATION_CREDENTIALS'))
     
     firebase_admin.initialize_app(cred)

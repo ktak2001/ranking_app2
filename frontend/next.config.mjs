@@ -4,16 +4,17 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const config = {
-  distDir: 'build',
+  distDir: "build",
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-    NEXT_PUBLIC_WEB_URL: process.env.NEXT_PUBLIC_WEB_URL
+    NEXT_PUBLIC_WEB_URL: process.env.NEXT_PUBLIC_WEB_URL,
+    // NEXT_PUBLIC_NODE_ENV: process.env.NODE_ENV
   },
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: '**',
+        protocol: "https",
+        hostname: "**",
       },
     ],
   },

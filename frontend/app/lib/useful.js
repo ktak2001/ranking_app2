@@ -8,5 +8,5 @@ export const yearMonth = () => {
 }
 
 export const showMoney = (value) => {
-  return Math.floor(value).toLocaleString() + " Pts"
+  return "￥"+Math.floor(value).toLocaleString()
 }

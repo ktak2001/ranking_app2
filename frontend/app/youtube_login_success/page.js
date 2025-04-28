@@ -18,15 +18,15 @@ export default function YoutubeRegisterSuccess() {
 
   const getAccount = useCallback((params) => {
     const tmpParams = params || JSON.parse(localStorage.getItem('oauth2-test-params'))
-    console.log("tmpParams", tmpParams)
+    // console.log("tmpParams", tmpParams)
     if (tmpParams && tmpParams['access_token']) {
       axios.get('https://www.googleapis.com/youtube/v3/channels?part=id&mine=true', {
         headers: { Authorization: `Bearer ${tmpParams['access_token']}` }
       })
         .then(res => {
-          console.log("res in YoutubeLogin", res)
+          // console.log("res in YoutubeLogin", res)
           if (!res.data.items || res.data.items.length === 0) {
-            console.error("Failed to retrieve channel data");
+            // console.error("Failed to retrieve channel data");
             setFailedMessage("選んだGmailアドレスに基づくYouTubeチャンネルは存在しません")
             setWaiting(false);
             setFail(true);
@@ -44,7 +44,7 @@ export default function YoutubeRegisterSuccess() {
           }
         })
     } else {
-      console.log("failed2", tmpParams)
+      // console.log("failed2", tmpParams)
     }
   }, [user]);
 
@@ -57,13 +57,13 @@ export default function YoutubeRegisterSuccess() {
         params[decodeURIComponent(m[1])] = decodeURIComponent(m[2]);
       }
       if (Object.keys(params).length > 0 && params['state']) {
-        console.log("params['state']", params['state'])
-        console.log("localStorage", localStorage.getItem('state'))
+        // console.log("params['state']", params['state'])
+        // console.log("localStorage", localStorage.getItem('state'))
         if (params['state'] == localStorage.getItem('state')) {
           localStorage.setItem('oauth2-test-params', JSON.stringify(params) );
           getAccount(params)
         } else {
-          console.log('State mismatch. Possible CSRF attack');
+          // console.log('State mismatch. Possible CSRF attack');
           setFail(true)
           setWaiting(false)
         }

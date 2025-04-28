@@ -20,22 +20,47 @@ export async function getSupporterInfo(supporterId) {
   return response.data;
 }
 
+
 export async function getSupportersRanking(year, month, youtuberId, showYear) {
-  const response = await axiosInstance.post(`/getSupportersRanking`, { year, month, youtuberId, showYear });
+  const payload = {
+    year : String(year),                  /* ← 変更 */
+    month: String(month).padStart(2, '0'),/* ← 変更 */
+    youtuberId,
+    showYear
+  };
+  const response = await axiosInstance.post('/getSupportersRanking', payload);
   return response.data;
 }
 
 export async function getAllSupportersRanking(year, month, showYear) {
-  const response = await axiosInstance.post(`/getAllSupportersRanking`, { year, month, showYear });
+  const payload = {
+    year : String(year),                  /* ← 変更 */
+    month: String(month).padStart(2, '0'),/* ← 変更 */
+    showYear
+  };
+  const response = await axiosInstance.post('/getAllSupportersRanking', payload);
   return response.data;
 }
+
 
 export async function getYoutubersRanking(year, month, showYear) {
-  const response = await axiosInstance.post(`/getYoutubersRanking`, { year, month, showYear });
+  const payload = {
+    year : String(year),                  /* ← 変更 */
+    month: String(month).padStart(2, '0'),/* ← 変更 */
+    showYear
+  };
+  const response = await axiosInstance.post('/getYoutubersRanking', payload);
   return response.data;
 }
 
+
 export async function getSupportingYoutubers(year, month, supporterId, showYear) {
-  const response = await axiosInstance.post(`/getSupportingYoutubers`, { year, month, supporterId, showYear });
+  const payload = {
+    year : String(year),                  /* ← 変更 */
+    month: String(month).padStart(2, '0'),/* ← 変更 */
+    supporterId,
+    showYear
+  };
+  const response = await axiosInstance.post('/getSupportingYoutubers', payload);
   return response.data;
 }

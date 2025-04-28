@@ -1,36 +1,71 @@
 #!/bin/bash
+set -euo pipefail
 
-INSTANCE_NAME="set-youtuber-superchats"
+##### 変数 ##############################################################
+INSTANCE="set-youtuber-superchats"
 ZONE="asia-northeast1-a"
 PROJECT="ranking-app-bf2df"
-STARTUP_SCRIPT_PATH="/Users/takehikazuki/Desktop/my_app3/ranking_app/scripts/startup-script.sh"
+STARTUP_SCRIPT="/Users/takehikazuki/Desktop/my_app3/ranking_app/scripts/startup-script.sh"
+LOG_FILE="/tmp/startup-script.log"
+DONE_MARK="Task completed successfully."
 
-# スタートアップスクリプトを更新
-gcloud compute instances add-metadata $INSTANCE_NAME \
---metadata-from-file startup-script=$STARTUP_SCRIPT_PATH \
---zone=$ZONE --project=$PROJECT
+##### 1) インスタンスが無ければ作成 ######################################
+if ! gcloud compute instances describe "${INSTANCE}" \
+        --zone="${ZONE}" --project="${PROJECT}" &>/dev/null; then
+  echo "Instance '${INSTANCE}' not found. Creating..."
+  gcloud compute instances create "${INSTANCE}" \
+    --zone="${ZONE}" --project="${PROJECT}" \
+    --machine-type=e2-standard-4 \
+    --service-account="compute-engine-sa@${PROJECT}.iam.gserviceaccount.com" \
+    --scopes=https://www.googleapis.com/auth/cloud-platform \
+    --metadata-from-file startup-script="${STARTUP_SCRIPT}"
+else
+  # 既存ならメタデータだけ更新
+  gcloud compute instances add-metadata "${INSTANCE}" \
+    --metadata-from-file startup-script="${STARTUP_SCRIPT}" \
+    --zone="${ZONE}" --project="${PROJECT}"
+fi
 
-# インスタンスを起動
-gcloud compute instances start $INSTANCE_NAME --zone=$ZONE --project=$PROJECT
+##### 2) インスタンス起動 ################################################
+echo "Starting instance..."
+gcloud compute instances start "${INSTANCE}" \
+  --zone="${ZONE}" --project="${PROJECT}"
 
-# インスタンスの起動を待つ
-while [[ $(gcloud compute instances describe $INSTANCE_NAME --zone=$ZONE --project=$PROJECT --format='value(status)') != "RUNNING" ]]; do
+##### 3) SSH が開くまで待つ #############################################
+echo -n "Waiting for SSH to become available"
+until gcloud compute ssh "${INSTANCE}" --zone="${ZONE}" --project="${PROJECT}" \
+        --command="echo ok" &>/dev/null; do
+  echo -n "."
   sleep 5
 done
+echo " connected."
 
-# スタートアップスクリプトの完了を待つ
-gcloud compute ssh $INSTANCE_NAME --zone=$ZONE --project=$PROJECT --command="tail -f /tmp/startup-script.log" &
+##### 4) 起動ログが出来るまで待つ #######################################
+echo -n "Waiting for ${LOG_FILE}"
+until gcloud compute ssh "${INSTANCE}" --zone="${ZONE}" --project="${PROJECT}" \
+        --command="test -f ${LOG_FILE}" &>/dev/null; do
+  echo -n "."
+  sleep 5
+done
+echo " found."
+
+##### 5) ログを追いながら DONE_MARK を監視 ###############################
+gcloud compute ssh "${INSTANCE}" --zone="${ZONE}" --project="${PROJECT}" \
+        --command="tail -F ${LOG_FILE}" &
 TAIL_PID=$!
 
-# "Task completed." が出力されるまで待つ
-while ! gcloud compute ssh $INSTANCE_NAME --zone=$ZONE --project=$PROJECT --command="grep 'Task completed.' /tmp/startup-script.log"; do
+echo "Streaming log. Waiting for completion mark..."
+until gcloud compute ssh "${INSTANCE}" --zone="${ZONE}" --project="${PROJECT}" \
+        --command="grep -q '${DONE_MARK}' ${LOG_FILE}" &>/dev/null; do
   sleep 10
 done
+echo "Startup-script finished."
 
-# tail プロセスを終了
-kill $TAIL_PID
+kill ${TAIL_PID} || true
 
-# インスタンスを停止
-gcloud compute instances stop $INSTANCE_NAME --zone=$ZONE --project=$PROJECT
+##### 6) インスタンス停止 ###############################################
+echo "Stopping instance..."
+gcloud compute instances stop "${INSTANCE}" \
+  --zone="${ZONE}" --project="${PROJECT}"
 
-echo "Process completed and instance stopped."
+echo "All done 🎉"

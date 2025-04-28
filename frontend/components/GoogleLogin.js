@@ -12,12 +12,12 @@ export default function GoogleLogin() {
     setWaiting(true)
     login()
       .catch((error) => {
-        console.error(error?.code)
+        // console.error(error?.code)
       })
       .finally(() => {
         setWaiting(false)
-        console.log("user", user)
-        console.log("waiting", waiting)
+        // console.log("user", user)
+        // console.log("waiting", waiting)
       })
   }
   return (

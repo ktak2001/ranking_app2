@@ -1,0 +1,29 @@
+/* 黒基調の塗りつぶしボタン */
+.btn-black {
+  background-color: #212529;   /* 落ち着いた黒背景 */
+  color: #ffffff;             /* 文字は白 */
+  border: 1px solid #212529;   /* 枠線も背景と同色（実質見えない） */
+  border-radius: 4px;          /* 角を少し丸める */
+  padding: 0.5rem 1rem;        /* 適度な上下左右余白 */
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+.btn-black:hover {
+  background-color: #343a40;   /* ホバーで少し明るい黒に変化 */
+  color: #ffffff;             /* 文字色は白のまま */
+  /* 枠線も必要に応じて #343a40 に */
+}
+
+/* 黒基調のアウトラインボタン */
+.btn-outline-black {
+  background-color: transparent; /* 背景透明 */
+  color: #212529;               /* 文字と枠線に黒(ダークグレー) */
+  border: 1px solid #212529;     /* 黒の枠線 */
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+.btn-outline-black:hover {
+  background-color: #212529;    /* ホバー時に黒背景に反転 */
+  color: #ffffff;              /* 文字色を白に反転 */
+  border-color: #212529;
+}

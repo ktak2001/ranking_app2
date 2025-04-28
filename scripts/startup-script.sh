@@ -1,71 +1,74 @@
 #!/bin/bash
+#
+# ────────────────────────────────
+#   startup-script.sh  (final)
+# ────────────────────────────────
+# VM 起動時に
+#   1. リポジトリ取得 / 更新
+#   2. venv 作成 & 依存インストール
+#   3. admin スクリプト実行
+#   4. ログを Cloud Storage へ退避
+#   5. VM をシャットダウン
+#
+# ※ 変えるなら BUCKET_NAME / PROJECT_ID くらい
 
-# エラーが発生しても即座に終了しない
-set +e
+set +e   # 失敗しても最後までログを書きたいので exit しない
 
-# ログファイルの設定
+## ─── 変数 ───────────────────────────────────────
 LOG_FILE="/tmp/startup-script.log"
-BUCKET_NAME="set_youtubers_log"  # Cloud Storageバケット名を設定してください
+BUCKET_NAME="set_youtubers_log"
+PROJECT_ID="ranking-app-bf2df"
+REPO="ranking_app2"
+REPO_URL="https://oauth2:$(gcloud secrets versions access latest --secret=github-token)@github.com/ktak2001/${REPO}.git"
 
-# ログ記録関数
+VENV_DIR="/opt/venv"
+VENV_PY="${VENV_DIR}/bin/python"
+VENV_PIP="${VENV_DIR}/bin/pip"
+
+export ENVIRONMENT="production"
+export GOOGLE_CLOUD_PROJECT="${PROJECT_ID}"
+
+## ─── 便利関数 ───────────────────────────────────
 log() {
-    local message="$(date '+%Y-%m-%d %H:%M:%S') - $1"
-    echo "$message" | tee -a "$LOG_FILE"
-    # Cloud Loggingにも送信
-    logger -p user.info "$message"
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - $*" | tee -a "${LOG_FILE}"
+  logger -p user.info "$*"
 }
 
 upload_log() {
-    if [ -f "$LOG_FILE" ]; then
-        gsutil cp "$LOG_FILE" "gs://$BUCKET_NAME/logs/startup-script-$(date +%Y%m%d-%H%M%S).log"
-    fi
+  gsutil -q cp "${LOG_FILE}" "gs://${BUCKET_NAME}/logs/startup-$(date +%Y%m%d-%H%M%S).log"
 }
 
-log "Starting startup script..."
-export ENVIRONMENT="production"
-export GOOGLE_CLOUD_PROJECT="ranking-app-bf2df"
+## ─── ここから処理 ───────────────────────────────
+log "Starting startup script…"
 
-# システムの更新とツールのインストール
-log "Updating system and installing necessary tools..."
-sudo apt-get update
-sudo apt-get install -y git python3-pip
+log "Updating apt & installing tools…"
+sudo apt-get update -y
+sudo apt-get install -y git python3-pip python3-venv
 
-# Secret Manager から GitHub Token を取得
-log "Retrieving GitHub token from Secret Manager..."
-export GITHUB_TOKEN=$(gcloud secrets versions access latest --secret="github-token")
-
-if [ -z "$GITHUB_TOKEN" ]; then
-    log "Error: Failed to retrieve GitHub token from Secret Manager"
-    upload_log
-    exit 1
-fi
-
-log "Checking for existing repository..."
-if [ -d "ranking_app2" ]; then
-    log "Existing repository found. Updating..."
-    cd ranking_app2
-    git pull
+log "Cloning / pulling repository…"
+if [[ -d ${REPO} ]]; then
+  (cd "${REPO}" && git pull)
 else
-    log "Cloning repository..."
-    git clone https://oauth2:${GITHUB_TOKEN}@github.com/ktak2001/ranking_app2.git
-    cd ranking_app2
+  git clone "${REPO_URL}"
 fi
 
-log "Installing Python dependencies..."
-cd backend
-pip3 install -r requirements.txt
+log "Creating venv & installing Python deps…"
+python3 -m venv "${VENV_DIR}"
+"${VENV_PIP}" install --no-cache-dir -r "${REPO}/backend/requirements.txt"
 
-log "Running admin tasks script..."
-export PYTHONPATH="/ranking_app2/backend:$PYTHONPATH"
-cd /ranking_app2/backend
-ENVIRONMENT=production GOOGLE_CLOUD_PROJECT=ranking-app-bf2df python3 ../scripts/set_youtubers.py 2>&1 | while IFS= read -r line; do
-    log "$line"
+log "Running admin task script…"
+# 仮想環境に入ったあと
+export PYTHONPATH="/ranking_app2/backend:${PYTHONPATH}"
+export PYTHONPATH="/${REPO}:${PYTHONPATH}"
+"${VENV_PY}" "${REPO}/scripts/set_youtubers.py" 2>&1 | while IFS= read -r line; do
+  log "$line"
 done
+TASK_RC=${PIPESTATUS[0]}
 
-if [ $? -ne 0 ]; then
-    log "Error occurred during task execution."
-    upload_log
-    exit 1
+if [[ ${TASK_RC} -ne 0 ]]; then
+  log "Task failed with code ${TASK_RC}"
+  upload_log
+  exit 1
 fi
 
 log "Task completed successfully."

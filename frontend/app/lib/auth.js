@@ -18,7 +18,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 
 export const login = () => {
   const provider = new GoogleAuthProvider()
-  console.log("login")
+  // console.log("login")
   return signInWithPopup(auth, provider)
 }
 
@@ -36,16 +36,16 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState();
 
   useEffect(() => {
-    console.log("inside useeffect")
+    // console.log("inside useeffect")
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log("onAuthStateChanged")
+      // console.log("onAuthStateChanged")
       if (firebaseUser) {
         const ref = doc(db, `users/${firebaseUser.uid}`);
         const snap = await getDoc(ref);
         // console.log("get snap", snap)
         if (snap.exists()) {
           const appUser = snap.data();
-          console.log("appUser1", appUser)
+          // console.log("appUser1", appUser)
           setUser(appUser);
         } else {
           const appUser = {
@@ -54,7 +54,7 @@ export const AuthProvider = ({ children }) => {
             email: firebaseUser.email,
             supporterId: "",
           };
-          console.log("appUser2", appUser)
+          // console.log("appUser2", appUser)
           setDoc(ref, appUser).then(() => {
             setUser(appUser);
           });

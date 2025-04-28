@@ -5,6 +5,7 @@ import Link from "next/link";
 import { showMoney } from "@/app/lib/useful.js";
 import Image from "next/image";
 import { getSupportersRanking } from "@/app/lib/api.js";
+import SafeImage from "./SafeImage.js";
 
 export default function UserRankingClient({ initialData, youtuberId, showYear, currentYear, selectedMonth }) {
   const [topSupporters, setTopSupporters] = useState(initialData.top_supporters)
@@ -13,7 +14,7 @@ export default function UserRankingClient({ initialData, youtuberId, showYear, c
 
   useEffect(() => {
     // console.log("currentMonth", currentMonth)
-    console.log("showYear", showYear)
+    // console.log("showYear", showYear)
     if (showYear || currentMonth !== selectedMonth)  {
       getSupportersRanking(currentYear, selectedMonth, youtuberId, showYear)
         .then(data => {
@@ -22,7 +23,7 @@ export default function UserRankingClient({ initialData, youtuberId, showYear, c
           setCurrentMonth(selectedMonth)
         })
         .catch(error => {
-          console.error("error in userranking", error)
+          // console.error("error in userranking", error)
         })
     }
   }, [youtuberId, selectedMonth, showYear])
@@ -45,8 +46,9 @@ export default function UserRankingClient({ initialData, youtuberId, showYear, c
             <tr key={supporterId}>
               <th scope="row" style={{ paddingLeft: '20px' }}>{idx+1}</th>
               <td className="d-flex align-items-center">
-                <Image
+                <SafeImage
                 src={supporterIconUrl}
+                fallbackSrc="/images/default-supporter.png"
                 alt={`${supporterName}'s icon`}
                 style={{ marginRight: '10px' }}
                 width={20}

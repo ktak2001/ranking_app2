@@ -1,139 +1,105 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import TabNavigation from "@/components/TabNavigation.js";
-import SupporterCard from '@/components/SupporterCard.js';
-import YoutuberCard from "@/components/YoutuberCards.js";
-import { getYoutubersRanking, getAllSupportersRanking } from './lib/api.js';
+import { useState, useEffect } from "react";
+import TabNavigation from "@/components/TabNavigation";
+import TabNavigation2 from "@/components/TabNavigation2";
+import RankingTable  from "@/components/RankingTable";
+import {
+  getYoutubersRanking,
+  getAllSupportersRanking,
+} from "@/app/lib/api";
 
-export default function ClientHome({ initialYoutubers, initialSupporters, year, month }) {
-  const [youtubers, setYoutubers] = useState([])
-  const [supporters, setSupporters] = useState(initialSupporters)
-  const [selectedMonth, setSelectedMonth] = useState(month);
-  const [currentMonth, setCurrentMonth] = useState(month)
-  const [showYear, setShowYear] = useState(false);
-  const [showSupportersRanking, setShowSupportersRanking] = useState(true)
-  const [currentShowSupporters, setCurrentShowSupporters] = useState(true)
-  const [loading, setLoading] = useState(false)
-  const allMonthArr = Array.from({length: parseInt(month) - 3}, (_, i) => String(parseInt(month) - i).padStart(2, '0'));
+/* ================================================
+ *  Home（ランキング一覧）
+ * ==============================================*/
+export default function ClientHome({ initialYoutubers, initialSupporters }) {
+  /* ─── 今日の日付 ─── */
+  const today        = new Date();
+  const thisYear     = today.getFullYear();
+  const thisMonthStr = String(today.getMonth() + 1).padStart(2, "0");
+
+  /* ───  state  ─── */
+  const [selectedYear,  setSelectedYear]  = useState(thisYear);
+  const [selectedMonth, setSelectedMonth] = useState(thisMonthStr);
+  const [showYear,      setShowYear]      = useState(false); // false = 月間
+  const [showSupporter, setShowSupporter] = useState(true);  // true  = Supporter
+
+  const [loading,    setLoading]    = useState(false);
+  const [youtubers,  setYoutubers]  = useState(initialYoutubers);
+  const [supporters, setSupporters] = useState(initialSupporters);
+
+  /* ─── 年・月 選択肢 ─── */
+  const earliestYear = 2024;
+  const yearsArr = Array.from(
+    { length: thisYear - earliestYear + 1 },
+    (_, i) => thisYear - i          // 2025, 2024 …
+  );
+
+  const maxMonth = selectedYear === thisYear ? thisMonthStr : "12";
+  const allMonthArr = Array.from(
+    { length: parseInt(maxMonth, 10) },
+    (_, i) => String(parseInt(maxMonth, 10) - i).padStart(2, "0")
+  );
+
+  /* ─── データ取得 ─── */
   useEffect(() => {
-    if (showYear || currentMonth !== selectedMonth || showSupportersRanking !== currentShowSupporters) {
-      console.log("inside useEffect", "showYear: ", showYear, "currentMonth: ", currentMonth, "selectedMonth: ", selectedMonth, "showSupporterRanking: ", showSupportersRanking)
-      setLoading(true)
-      if (showSupportersRanking) {
-        getAllSupportersRanking(year, selectedMonth, showYear)
-          .then(data => {
-            setSupporters(data)
-            setCurrentMonth(selectedMonth)
-            setCurrentShowSupporters(true)
-            setLoading(false)
-          })
-      } else {
-        getYoutubersRanking(year, selectedMonth, showYear)
-          .then(data => {
-            console.log("youtubers data", data)
-            setYoutubers(data)
-            setCurrentMonth(selectedMonth)
-            setCurrentShowSupporters(false)
-            setLoading(false);
-          })
-      }
-    }
-  }, [year, selectedMonth, showYear, showSupportersRanking])
+    setLoading(true);
+
+    const fetcher = showSupporter
+      ? getAllSupportersRanking
+      : getYoutubersRanking;
+
+    fetcher(selectedYear, selectedMonth, showYear)
+      .then((data) => {
+        if (showSupporter) setSupporters(data);
+        else               setYoutubers(data);
+      })
+      .finally(() => setLoading(false));
+  }, [selectedYear, selectedMonth, showYear, showSupporter]);
+
+  /* ─── 画面 ─── */
   return (
-    <div>
-      <TabNavigation
+    <div className="container-fluid pt-3">
+
+      {/* ==== フィルター ==== */}
+      <TabNavigation2
+        yearsArr={yearsArr}
+        selectedYear={selectedYear}
+        setSelectedYear={setSelectedYear}
+        allMonthArr={allMonthArr}
         selectedMonth={selectedMonth}
         setSelectedMonth={setSelectedMonth}
-        setShowYear={setShowYear}
-        allMonthArr={allMonthArr}
-        year={year}
         showYear={showYear}
+        setShowYear={setShowYear}
       />
-      <div className="d-flex justify-content-between align-items-center mb-3 mx-3">
-        <div className="dropdown">
+
+      {/* ==== モード切替 ==== */}
+      <div className="mb-3">
+        <div className="btn-group">
           <button
-            className="btn btn-secondary dropdown-toggle"
-            type="button"
-            id="dropdownMenuButton"
-            data-bs-toggle="dropdown"
-            aria-expanded="false"
+            className={`btn btn-outline-primary ${!showSupporter && "active"}`}
+            onClick={() => setShowSupporter(false)}
           >
-            {showSupportersRanking ? "Supporters" : "Youtubers"}
+            Youtubers
           </button>
-          <ul className="dropdown-menu" aria-labelledby="dropdownMenuButton">
-            <li>
-              <button
-                className="dropdown-item"
-                onClick={() => setShowSupportersRanking(false)}
-              >
-                Youtubers
-              </button>
-            </li>
-            <li>
-              <button
-                className="dropdown-item"
-                onClick={() => setShowSupportersRanking(true)}
-              >
-                Supporters
-              </button>
-            </li>
-          </ul>
-        </div>
-        <div className="text-end">
-          <p className="mb-2">
-            β版です。改善してほしいことがあればなんでも送ってください。
-          </p>
-          <div>
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(
-                  "vtuber.nagesen.ranking@gmail.com"
-                );
-                alert("メールアドレスをコピーしました");
-              }}
-              className="btn btn-outline-secondary btn-sm me-2"
-            >
-              メール: vtuber.nagesen.ranking@gmail.com
-            </button>
-            <a
-              href="https://twitter.com/vtuber_nagesen"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-outline-primary btn-sm"
-            >
-              Twitter: @vtuber_nagesen
-            </a>
-          </div>
+          <button
+            className={`btn btn-outline-primary ${showSupporter && "active"}`}
+            onClick={() => setShowSupporter(true)}
+          >
+            Supporters
+          </button>
         </div>
       </div>
-      {!showSupportersRanking && !loading && (
-        <div className="container text-center">
-          <div className="row">
-            {youtubers.map((youtuber) => (
-              <div key={youtuber.youtuberId} className="col mb-4">
-                <YoutuberCard youtuber={youtuber} inSupporterPage={false} />
-              </div>
-            ))}
-          </div>
-        </div>
+
+      {/* ==== テーブル ==== */}
+      {loading && <p className="text-center">Loading…</p>}
+
+      {!loading && (
+        <RankingTable
+          list={showSupporter ? supporters : youtubers}
+          mode={showSupporter ? "supporter" : "youtuber"}
+        />
       )}
-      {showSupportersRanking && !loading && (
-        <div className="container text-center">
-          <div className="row">
-            {supporters.slice(0, 30).map((supporter, i) => (
-              <div key={i} className="col mb-4">
-                <SupporterCard supporter={supporter} />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {
-        loading && (
-          <div>loading</div>
-        )
-      }
     </div>
   );
 }

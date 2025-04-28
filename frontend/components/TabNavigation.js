@@ -1,55 +1,61 @@
-"use client"
+"use client";
 
 import React from "react";
 
-export default function TabNavigation({ selectedMonth, setSelectedMonth, setShowYear, allMonthArr, year, showYear }) {
+/**
+ * 年・月セレクタ
+ *  - month を選べば 月間表示（showYear=false）
+ *  - year を選べば 年間表示（showYear=true）
+ */
+export default function TabNavigation({
+  yearsArr,
+  selectedYear,
+  setSelectedYear,
+  allMonthArr,
+  selectedMonth,
+  setSelectedMonth,
+  showYear,
+  setShowYear
+}) {
   return (
-    <div style={{ marginBottom: '20px' }}>
-      <ul className="nav nav-tabs" id="myTab" role="tablist">
-        <li className="nav-item dropdown">
-          <button 
-            className={`nav-link dropdown-toggle ${!showYear ? 'active' : ''}`} 
-            data-bs-toggle="dropdown" 
-            role="button" 
-            aria-expanded="false"
-          >
-            {selectedMonth[0]=="0" ? selectedMonth[1] : selectedMonth}月
-          </button>
-          <ul className="dropdown-menu">
-            {allMonthArr.map(el => (
-              <li key={el}>
-                <button 
-                  className="dropdown-item" 
-                  onClick={() => { 
-                    setSelectedMonth(el); 
-                    setShowYear(false); 
-                  }}
-                >
-                  {el[0]=='0' ? el[1] : el}月
-                </button>
-              </li>
-            ))}
-          </ul>
-        </li>
-        <li className="nav-item" role="presentation">
-          <button 
-            className={`nav-link ${showYear ? 'active' : ''}`} 
-            id="profile-tab" 
-            data-bs-toggle="tab" 
-            data-bs-target="#profile-tab-pane" 
-            type="button" 
-            role="tab" 
-            aria-controls="profile-tab-pane" 
-            aria-selected={showYear}
-            onClick={() => 
-              {
-                setShowYear(true);
-              }}
-          >
-            {year}年
-          </button>
-        </li>
-      </ul>
+    <div className="mt-5 d-flex gap-2 align-items-center mb-4">
+
+      {/* 月セレクト */}
+      <select
+        className="form-select w-auto"
+        value={selectedMonth}
+        onChange={(e) => {
+          setSelectedMonth(e.target.value);
+          setShowYear(false);
+        }}
+      >
+        {allMonthArr.map((m) => (
+          <option key={m} value={m}>
+            {Number(m)} 月
+          </option>
+        ))}
+      </select>
+
+      {/* 年セレクト */}
+      <select
+        className="form-select w-auto"
+        value={selectedYear}
+        onChange={(e) => {
+          setSelectedYear(Number(e.target.value));
+          setShowYear(true);
+        }}
+      >
+        {yearsArr.map((y) => (
+          <option key={y} value={y}>
+            {y} 年
+          </option>
+        ))}
+      </select>
+
+      {/* 表示モード・バッジ */}
+      <span className="badge bg-light text-muted ms-2">
+        {showYear ? "年間合計" : "月間"}
+      </span>
     </div>
   );
 }

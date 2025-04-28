@@ -228,6 +228,7 @@ def get_all_supporters_ranking(_year, _month, showYear):
     top_supporters = []
     for youtuber_doc in youtubers_docs:
         youtuber = youtuber_doc.to_dict()
+        # print("youtuber", youtuber)
         supporters = get_supporters_ranking(_year, _month, youtuber['youtuberId'], showYear)
         for supporter in supporters['top_supporters']:
             supporter['youtuberId'] = youtuber['youtuberId']
@@ -240,32 +241,51 @@ def get_all_supporters_ranking(_year, _month, showYear):
 
 @cache_with_persistence()
 def get_supporters_ranking(_year, _month, youtuberId, showYear):
-  youtuber_ref = db.collection('youtubers').document(youtuberId)
-  youtuberName = (youtuber_ref.get().to_dict())['youtuberName']
-  if showYear:
-    total_amount = (youtuber_ref.collection('summary').document(_year).get().to_dict()).get('totalAmount', 0)
-    youtuber_supporter_list = youtuber_ref.collection('supporters').order_by(f"yearlyAmount.{_year}", direction=firestore.Query.DESCENDING).limit(100).stream()
-  else:
-    total_amount = (youtuber_ref.collection('summary').document(_year).get().to_dict()).get('monthlyAmount', {}).get(_month, 0)
-    youtuber_supporter_list = youtuber_ref.collection('supporters').order_by(f"monthlyAmount.{_year}{_month}", direction=firestore.Query.DESCENDING).limit(100).stream()
-  top_supporters = []
-  for supporter in youtuber_supporter_list:
-    supporter_data = supporter.to_dict()
+    youtuber_ref = db.collection('youtubers').document(youtuberId)
+    # ① summary ドキュメントを取得
+    print("year_month", _year, _month)
+    print("youtuber_doc", youtuber_ref.collection('summary').document(_year))
+    summary_doc = youtuber_ref.collection('summary').document(_year).get()
+    summary = summary_doc.to_dict() or {}     # 存在しなければ {} に
+    print("summary", summary)
+    logging.info(f"summary: {summary}")
+    # ② 年間 or 月間の合計額を取り出す
     if showYear:
-      amount = supporter_data.get('yearlyAmount', {}).get(_year, 0)
+        total_amount = summary.get('totalAmount', 0)
+        order_field = f"yearlyAmount.{_year}"
     else:
-      amount = supporter_data.get('monthlyAmount', {}).get(_year+_month, 0)
-    top_supporters.append({
-      'supporterName': supporter_data['supporterName'],
-      'supporterId': supporter.id,
-      'amount': amount,
-      "supporterIconUrl": supporter_data['supporterIconUrl']
-    })
-  return {
-    "total_amount": total_amount,
-    "top_supporters": top_supporters,
-    'youtuberName': youtuberName
-  }
+        monthly_map = summary.get('monthlyAmount', {})
+        total_amount = monthly_map.get(_month, 0)
+        order_field = f"monthlyAmount.{_year}{_month}"
+
+    # ③ 支援者ランキングを取得
+    youtuber_supporter_list = (
+        youtuber_ref
+          .collection('supporters')
+          .order_by(order_field, direction=firestore.Query.DESCENDING)
+          .limit(100)
+          .stream()
+    )
+
+    top_supporters = []
+    for supporter in youtuber_supporter_list:
+        data = supporter.to_dict()
+        if showYear:
+            amount = data.get('yearlyAmount', {}).get(_year, 0)
+        else:
+            amount = data.get('monthlyAmount', {}).get(_year + _month, 0)
+        top_supporters.append({
+            'supporterName': data['supporterName'],
+            'supporterId': supporter.id,
+            'amount': amount,
+            'supporterIconUrl': data['supporterIconUrl']
+        })
+
+    return {
+        "total_amount": total_amount,
+        "top_supporters": top_supporters,
+        "youtuberName": (youtuber_ref.get().to_dict() or {}).get('youtuberName', '')
+    }
 
 @app.route("/api/getYoutuberInfo", methods=["POST"])
 def getYoutuberInfo():
@@ -487,4 +507,4 @@ def create_checkout_session():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=True)

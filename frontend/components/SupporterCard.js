@@ -1,66 +1,67 @@
-import React from "react";
-import Link from "next/link";
-import { showMoney } from "@/app/lib/useful.js";
-import Image from "next/image";
+/* サポーター ランキングの 1 行分（テーブル行） */
+import React from 'react';
+import Link from 'next/link';
+import { showMoney } from '@/app/lib/useful.js';
+import SafeImage from './SafeImage.js';
 
-export default function SupporterCard({ supporter }) {
+export default function SupporterCard({ supporter, rank }) {
   return (
-    <div className="card shadow-sm" style={{ width: "18rem" }}>
-      <div style={{ position: "relative", width: "100%", paddingTop: "100%" }}>
-        <Image
-          src={supporter.supporterIconUrl}
-          alt={supporter.supporterName}
-          fill
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          style={{
-            objectFit: "cover",
-          }}
-          unoptimized
-        />
-      </div>
-      <div className="card-body p-3">
-        <h4 className="card-title mb-2">{supporter.supporterName}</h4>
-        <h5 className="card-text mb-3">
-          応援額: {showMoney(supporter.amount)}
-        </h5>
-        <div className="d-flex align-items-center mb-3">
-          <div
-            style={{
-              width: "40px",
-              height: "40px",
-              position: "relative",
-              marginRight: "10px",
-              overflow: "hidden",
-              borderRadius: "50%",
-            }}
-          >
-            <Image
-              src={supporter.youtuberIconUrl}
-              alt={supporter.youtuberName}
-              fill
-              style={{
-                objectFit: "cover",
-              }}
-              unoptimized
-            />
-          </div>
-          <span>対象VTuber: {supporter.youtuberName}</span>
+    <tr>
+      {/* ランク番号 */}
+      <th scope="row" style={{ width: '60px' }}>{rank}</th>
+
+      {/* サポーター アイコン＋名前 */}
+      <td>
+        <div className="d-flex align-items-center gap-2">
+          <SafeImage
+            fallbackSrc="/images/default-supporter.png"
+            src={supporter.supporterIconUrl}
+            alt={supporter.supporterName}
+            width={40}
+            height={40}
+            style={{ borderRadius: '50%', objectFit: 'cover' }}
+            unoptimized
+          />
+          <span>{supporter.supporterName}</span>
         </div>
-        <div className="d-grid gap-2">
-          <Link
-            href={`/youtubers/${supporter.youtuberId}`}
-            className="btn btn-outline-primary btn-sm"
-          >
-            VTuberの詳細を見る
-          </Link>
+      </td>
+
+      {/* 対象 VTuber（アイコン＋名前） */}
+      <td>
+        <div className="d-flex align-items-center gap-2">
+          <SafeImage
+            fallbackSrc="/images/default-youtuber.png"
+            src={supporter.youtuberIconUrl}
+            alt={supporter.youtuberName}
+            width={24}
+            height={24}
+            style={{ borderRadius: '50%', objectFit: 'cover' }}
+            unoptimized
+          />
+          <span className="small text-muted">{supporter.youtuberName}</span>
+        </div>
+      </td>
+
+      {/* 応援額 */}
+      <td className="text-end">{showMoney(supporter.amount)}</td>
+
+      {/* 詳細ボタン */}
+      <td style={{ width: '120px' }}>
+        <div className="d-flex gap-1">
           <Link
             href={`/supporters/${supporter.supporterId}`}
-            className="btn btn-primary btn-sm"
+            className="btn btn-primary btn-sm flex-fill"
           >
-            このサポーターの詳細を見る
+            SP 詳細
+          </Link>
+          <Link
+            href={`/youtubers/${supporter.youtuberId}`}
+            className="btn btn-outline-primary btn-sm flex-fill"
+          >
+            VT 詳細
           </Link>
         </div>
-      </div>
-    </div>
+      </td>
+    </tr>
   );
 }

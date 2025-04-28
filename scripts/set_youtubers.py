@@ -1,8 +1,8 @@
 import google.cloud.logging
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from admin_tasks import set_youtuber_superChats
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from backend.admin_tasks import set_youtuber_superChats
 import logging
 
 client = google.cloud.logging.Client()
@@ -31,7 +31,7 @@ def init():
     except Exception as e:
         logger.error(f"Error reading CSV file: {str(e)}")
         return
-    set_youtuber_superChats(youtubers[9:])
+    set_youtuber_superChats(youtubers)
 
 if __name__ == "__main__":
     try:
