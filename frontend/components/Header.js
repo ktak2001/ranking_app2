@@ -8,7 +8,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { db } from "@/app/lib/firebaseConfig";
 import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import styles from "./Header.module.css";
-import btn from '@/styles/Buttons.module.css';
+import './Header.buttons.css';
 import { FaUserPlus } from 'react-icons/fa'
 
 export default function Header() {
@@ -75,12 +75,12 @@ export default function Header() {
   }, []);
 
   return (
-    <header className={`navbar navbar-light fixed-top shadow-sm ${styles.header} ${scrolled ? styles.scrolled : ""}`}>
+    <header className={`navbar navbar-light fixed-top shadow-sm ${styles.header} ${scrolled ? styles.scrolled : ""} mb-5`}>
       <div className="container-fluid">
 
         {/* Brand */}
         <Link href="/" className="navbar-brand fw-semibold text-dark">
-          VTuber&nbsp;Support
+          OpenSuperchat
         </Link>
 
         {/* Search */}
@@ -113,20 +113,20 @@ export default function Header() {
         <div className="d-flex align-items-center gap-2">
 
           {user == null && (
-            <button className={btn.black} onClick={login}>
-              <FaUserPlus className="me-1" /> 会員登録・ログイン
+            <button className="btn-pill-blue" onClick={login}>
+              無料ユーザー登録・ログイン
             </button>
           )}
 
           {user && user.supporterId && (
-            <Link href={`/supporters/${user.supporterId}`} className={btn.black}>
-              <FaUserPlus className="me-1" /> マイページ
+            <Link href={`/supporters/${user.supporterId}`} className="btn-pill-blue">
+              マイページ
             </Link>
           )}
 
           {user && (
-            <button className={btn.black} onClick={logout}>
-              <FaUserPlus className="me-1" /> ログアウト
+            <button className="btn-pill-blue" onClick={logout}>
+              ログアウト
             </button>
           )}
         </div>

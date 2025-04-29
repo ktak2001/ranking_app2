@@ -1,0 +1,13 @@
+/*  tables.css  (globals.css に書いても可)  */
+
+/* クリック出来るセルに付けるユーティリティ */
+.link-cell{
+  cursor:pointer;                 /* 手形カーソル               */
+  transition:background-color .15s;
+}
+
+/* ホバー時のハイライト色は Bootstrap に合わせて薄グレー (#f8f9fa) */
+.link-cell:hover{
+  background:#adcad0;
+  text-decoration:none;           /* リンク下線を消したまま     */
+}

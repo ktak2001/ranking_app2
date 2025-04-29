@@ -1,11 +1,14 @@
 import Link      from "next/link";
 import { showMoney } from "@/app/lib/useful";
 import SafeImage from "./SafeImage";
+import { useRouter } from "next/navigation";
+import "./Tables.css"
 
 /**
  * サポーター用 1 行
  */
 export default function SupporterTableRow({ rank, data }) {
+  // const router = useRouter()
   return (
     <tr className="border-bottom">
 
@@ -14,7 +17,10 @@ export default function SupporterTableRow({ rank, data }) {
 
       {/* Supporter */}
       <td>
-        <div className="d-flex align-items-center gap-2">
+        <Link
+          href={`/supporters/${data.supporterId}`}
+          className="d-flex align-items-center gap-2 text-dark text-decoration-none link-cell"
+        >
           <SafeImage
             src={data.supporterIconUrl}
             fallbackSrc="/images/default-supporter.png"
@@ -25,12 +31,15 @@ export default function SupporterTableRow({ rank, data }) {
             unoptimized
           />
           {data.supporterName}
-        </div>
+        </Link>
       </td>
 
       {/* 対象 VTuber */}
       <td>
-        <div className="d-flex align-items-center gap-2">
+        <Link
+          href={`/youtubers/${data.youtuberId}`}
+          className="d-flex align-items-center gap-2 text-dark text-decoration-none link-cell"
+        >
           <SafeImage
             src={data.youtuberIconUrl}
             fallbackSrc="/images/default-youtuber.png"
@@ -41,23 +50,11 @@ export default function SupporterTableRow({ rank, data }) {
             unoptimized
           />
           <span className="text-muted fw-medium">{data.youtuberName}</span>
-        </div>
+        </Link>
       </td>
 
       {/* 金額 */}
       <td className="text-end fw-semibold">{showMoney(data.amount)}</td>
-
-      {/* 操作 */}
-      <td>
-        <div className="d-flex gap-2">
-          <Link href={`/supporters/${data.supporterId}`} className="btn btn-outline-primary btn-sm">
-            SP 詳細
-          </Link>
-          <Link href={`/youtubers/${data.youtuberId}`} className="btn btn-outline-secondary btn-sm">
-            VT 詳細
-          </Link>
-        </div>
-      </td>
     </tr>
   );
 }

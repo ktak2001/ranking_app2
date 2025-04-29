@@ -1,6 +1,5 @@
 import { yearMonth } from "./lib/useful.js";
 import ClientHome from "./ClientHome.js";
-import ClientHome2 from "./ClientHome2.js"
 import { getYoutubersRanking, getAllSupportersRanking } from "./lib/api.js";
 
 export const metadata = {

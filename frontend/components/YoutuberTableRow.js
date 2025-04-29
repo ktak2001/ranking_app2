@@ -1,6 +1,8 @@
 import Link      from "next/link";
 import { showMoney } from "@/app/lib/useful";
 import SafeImage from "./SafeImage";
+import { useRouter } from "next/navigation";
+import "./Tables.css"
 
 /**
  * VTuber 用ランキング 1 行
@@ -10,15 +12,22 @@ import SafeImage from "./SafeImage";
  *  ── data : { youtuberId, youtuberName, youtuberIconUrl, amount }
  */
 export default function YoutuberTableRow({ rank, data }) {
+  const router = useRouter();
   return (
     <tr className="border-bottom">
 
       {/* ランク番号 */}
-      <td className="text-muted fw-semibold">{rank}</td>
+      <td className="text-muted fw-semibold border-bottom">{rank}</td>
 
       {/* VTuber */}
-      <td>
-        <div className="d-flex align-items-center gap-2">
+      <td
+        className="hover:cursor-pointer"
+        onClick={() => router.push(`/youtubers/${data.youtuberId}`)}
+      >
+        <Link
+          href={`/youtubers/${data.youtuberId}`}
+          className="d-flex align-items-center gap-2 text-dark text-decoration-none link-cell"
+        >
           <SafeImage
             src={data.youtuberIconUrl}
             fallbackSrc="/images/default-youtuber.png"
@@ -28,22 +37,12 @@ export default function YoutuberTableRow({ rank, data }) {
             className="rounded-circle flex-shrink-0"
             unoptimized
           />
-          {data.youtuberName}
-        </div>
+          <span className="text-muted fw-medium">{data.youtuberName}</span>
+        </Link>
       </td>
 
       {/* 応援額 */}
       <td className="text-end fw-semibold">{showMoney(data.amount)}</td>
-
-      {/* 詳細 */}
-      <td style={{ width: "120px" }}>
-        <Link
-          href={`/youtubers/${data.youtuberId}`}
-          className="btn btn-outline-primary btn-sm w-100"
-        >
-          詳細
-        </Link>
-      </td>
     </tr>
   );
 }

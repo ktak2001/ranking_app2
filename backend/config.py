@@ -3,7 +3,9 @@ import json
 import firebase_admin
 from firebase_admin import credentials, firestore
 from dotenv import load_dotenv
+import logging
 
+logger = logging.getLogger(__name__)
 # Load environment variables from .env file if present
 load_dotenv()
 
@@ -15,6 +17,9 @@ ENVIRONMENT = os.environ.get('ENVIRONMENT', 'development')
 GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT')
 PROJECT_ID="ranking-app-bf2df"
 IS_CLOUD_RUN = os.environ.get('K_SERVICE') is not None
+
+print("ENVIRONMENT", ENVIRONMENT)
+print("GOOGLE_CLOUD_PROJECT", GOOGLE_CLOUD_PROJECT)
 
 def access_secret_version(project_id, secret_id, version_id="latest"):
     try:

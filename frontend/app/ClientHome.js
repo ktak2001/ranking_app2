@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import TabNavigation from "@/components/TabNavigation";
-import TabNavigation2 from "@/components/TabNavigation2";
 import RankingTable  from "@/components/RankingTable";
+import RankingTable2 from "@/components/RankingTable2.js"
 import {
   getYoutubersRanking,
   getAllSupportersRanking,
@@ -59,10 +59,10 @@ export default function ClientHome({ initialYoutubers, initialSupporters }) {
 
   /* ─── 画面 ─── */
   return (
-    <div className="container-fluid pt-3">
+    <div className="container-fluid pt-4">
 
       {/* ==== フィルター ==== */}
-      <TabNavigation2
+      <TabNavigation
         yearsArr={yearsArr}
         selectedYear={selectedYear}
         setSelectedYear={setSelectedYear}
@@ -95,9 +95,9 @@ export default function ClientHome({ initialYoutubers, initialSupporters }) {
       {loading && <p className="text-center">Loading…</p>}
 
       {!loading && (
-        <RankingTable
+        <RankingTable2
           list={showSupporter ? supporters : youtubers}
-          mode={showSupporter ? "supporter" : "youtuber"}
+          variant={showSupporter ? "supporter-youtuber" : "youtuber-only"}
         />
       )}
     </div>

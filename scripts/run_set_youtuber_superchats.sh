@@ -16,7 +16,7 @@ if ! gcloud compute instances describe "${INSTANCE}" \
   gcloud compute instances create "${INSTANCE}" \
     --zone="${ZONE}" --project="${PROJECT}" \
     --machine-type=e2-standard-4 \
-    --service-account="compute-engine-sa@${PROJECT}.iam.gserviceaccount.com" \
+    --service-account="firebase-adminsdk-vtb8n@ranking-app-bf2df.iam.gserviceaccount.com" \
     --scopes=https://www.googleapis.com/auth/cloud-platform \
     --metadata-from-file startup-script="${STARTUP_SCRIPT}"
 else

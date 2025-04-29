@@ -7,6 +7,7 @@ import YoutuberCard from '@/components/YoutuberCards.js';
 import { getSupportingYoutubers } from '@/app/lib/api.js';
 import { yearMonth } from '@/app/lib/useful.js';
 import SafeImage from "@/components/SafeImage.js";
+import RankingTable from '@/components/RankingTable2.js';
 
 export default function SupporterDetailsClient({ supporterInfo, params }) {
   /* ---------- 現在年月 ---------- */
@@ -48,7 +49,7 @@ export default function SupporterDetailsClient({ supporterInfo, params }) {
 
   /* ---------- UI ---------- */
   return (
-    <div>
+    <div className='mt-5 pt-5'>
       {/* プロフィールヘッダー */}
       <header
         style={{
@@ -87,20 +88,12 @@ export default function SupporterDetailsClient({ supporterInfo, params }) {
         setShowYear={setShowYear}
       />
 
-      {/* ランキング */}
       {loading && <p className="text-center">Loading…</p>}
-
       {!loading && (
-        <div className="container text-center">
-          <div className="row">
-            {youtubers.map(y => (
-              <div key={y.youtuberId} className="col mb-4">
-                <YoutuberCard youtuber={y} inSupporterPage />
-              </div>
-            ))}
-            {youtubers.length === 0 && <h1>Not supported this period</h1>}
-          </div>
-        </div>
+        <RankingTable
+          variant="youtuber-only"   // VTuber と応援額だけ
+          list={youtubers}
+        />
       )}
     </div>
   );

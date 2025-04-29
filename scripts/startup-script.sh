@@ -58,8 +58,7 @@ python3 -m venv "${VENV_DIR}"
 
 log "Running admin task script…"
 # 仮想環境に入ったあと
-export PYTHONPATH="/ranking_app2/backend:${PYTHONPATH}"
-export PYTHONPATH="/${REPO}:${PYTHONPATH}"
+export PYTHONPATH="/ranking_app2/backend:/ranking_app2:${PYTHONPATH}"
 "${VENV_PY}" "${REPO}/scripts/set_youtubers.py" 2>&1 | while IFS= read -r line; do
   log "$line"
 done
@@ -68,7 +67,7 @@ TASK_RC=${PIPESTATUS[0]}
 if [[ ${TASK_RC} -ne 0 ]]; then
   log "Task failed with code ${TASK_RC}"
   upload_log
-  exit 1
+  sudo poweroff
 fi
 
 log "Task completed successfully."

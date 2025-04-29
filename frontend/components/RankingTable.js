@@ -17,14 +17,14 @@ export default function RankingTable({ list, mode }) {
             <>
               <th>VTuber</th>
               <th className="text-end">応援額</th>
-              <th style={{ width: "120px" }}></th>
+              <th style={{ width: "30px" }}></th>
             </>
           ) : (
             <>
               <th>Supporter</th>
               <th>対象 VTuber</th>
               <th className="text-end">応援額</th>
-              <th style={{ width: "160px" }}></th>
+              <th style={{ width: "30px" }}></th>
             </>
           )}
         </tr>
