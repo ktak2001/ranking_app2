@@ -128,7 +128,13 @@ def update_for_each_video(youtuber_info, video):
         time.sleep(30)
         all_supporters_info, video_total_earning = get_superchats_with_retry(yt_url)
         if all_supporters_info is None:
-            # 略 (既存コード)
+            error_name = video_total_earning
+            db.collection("youtubers").document(youtuber_info['youtuber_id']).set({
+                'unnecessaryVideoIds': firestore.ArrayUnion([{
+                    'id': video['id'],
+                    'error': error_name
+                }])
+            }, merge=True)
             return
 
         # ★ 動画 Doc 書き込み (VTuber 側)
@@ -161,9 +167,15 @@ def update_for_each_video(youtuber_info, video):
         # 既存まとめの後、各サポーター処理へ渡す
         for _, supporter in all_supporters_info.items():
             update_supporter(supporter, '_' + published_at[:4], '_' + published_at[5:7], supporter['amount'], youtuber_info['youtuber_id'], video_id, vid_info, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing)
+    except RetryError as e:
+        logger.error(f"Failed to process video {video['id']} after 5 retries: {str(e)}")
+        sys.exit(1)  # スクリプトを終了
     except Exception as e:
         logger.error(f"Unexpected error in update_for_each_video: {str(e)}")
         sys.exit(1)
+    finally:
+        time.sleep(5)
+
 
 # def update_doc(youtuber_info, video_info, all_supporters_info):
 #     youtuber_id, youtuber_name, youtuber_icon_url, youtuber_custom_url = (
