@@ -39,6 +39,17 @@ class YouTubeAPI:
     if page_token:
       url += f"&pageToken={page_token}"
     return requests.get(url).json()
+  
+  def get_channel_info(self, channel_id):
+    url = f"{self.BASE_URL}/channels?part=contentDetails,snippet&id={channel_id}&key={self.api_key}"
+    response = requests.get(url).json()
+    item = response["items"][0]
+    return {
+      "uploads_id": item["contentDetails"]["relatedPlaylists"]["uploads"],
+      "youtuber_icon_url": item['snippet']['thumbnails']['medium']['url'],
+      "youtuber_name": item['snippet']['title'],
+      "youtuber_custom_url": item['snippet']['customUrl']
+    }
 
   # def get_video_details(self, video_id):
   #   url = f"{self.BASE_URL}/videos?part=liveStreamingDetails,statistics,status,topicDetails,localizations,snippet,contentDetails&id={video_id}&key={self.api_key}"
