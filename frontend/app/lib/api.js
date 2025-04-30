@@ -20,7 +20,6 @@ export async function getSupporterInfo(supporterId) {
   return response.data;
 }
 
-
 export async function getSupportersRanking(year, month, youtuberId, showYear) {
   const payload = {
     year : String(year),                  /* ← 変更 */
@@ -42,6 +41,17 @@ export async function getAllSupportersRanking(year, month, showYear) {
   return response.data;
 }
 
+export async function getYoutuberVideosRanking(year, month, youtuberId, showYear = false) {
+  const payload = {
+    year : String(year),
+    month: String(month).padStart(2, "0"),
+    youtuberId,
+    showYear,
+  };
+  // main.py 側で `/api/getYoutuberVideosRanking` にしているため先頭に /api を付ける
+  const response = await axiosInstance.post("/getYoutuberVideosRanking", payload);
+  return response.data;        // → { videos: [...], total_amount: N }
+}
 
 export async function getYoutubersRanking(year, month, showYear) {
   const payload = {

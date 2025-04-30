@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import TabNavigation from "@/components/TabNavigation";
-import RankingTable  from "@/components/RankingTable";
-import RankingTable2 from "@/components/RankingTable2.js"
+import RankingTable from "@/components/RankingTable.js"
 import {
   getYoutubersRanking,
   getAllSupportersRanking,
@@ -95,7 +94,7 @@ export default function ClientHome({ initialYoutubers, initialSupporters }) {
       {loading && <p className="text-center">Loading…</p>}
 
       {!loading && (
-        <RankingTable2
+        <RankingTable
           list={showSupporter ? supporters : youtubers}
           variant={showSupporter ? "supporter-youtuber" : "youtuber-only"}
         />

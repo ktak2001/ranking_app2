@@ -1,44 +1,28 @@
 "use client";
 
-import YoutuberTableRow   from "./YoutuberTableRow";
-import SupporterTableRow  from "./SupporterTableRow";
+import EntityAmountTable          from "./EntityAmountTable";
+import SupporterWithYoutuberTable from "./SupporterWithYoutuberTable";
+import VideoTable                 from "./VideoTableRow";          // ★ new
 
 /**
- * mode: "youtuber" | "supporter"
+ * variant:
+ *   "supporter-youtuber" | "supporter-only" | "youtuber-only" | "video-only"
  */
-export default function RankingTable({ list, mode }) {
-  return (
-    <table className="table table-hover align-middle">
-      <thead className="table-light">
-        <tr>
-          <th style={{ width: "60px" }}>#</th>
+export default function RankingTable({ variant, list }) {
+  switch (variant) {
+    case "supporter-youtuber":
+      return <SupporterWithYoutuberTable list={list} />;
 
-          {mode === "youtuber" ? (
-            <>
-              <th>VTuber</th>
-              <th className="text-end">応援額</th>
-              <th style={{ width: "30px" }}></th>
-            </>
-          ) : (
-            <>
-              <th>Supporter</th>
-              <th>対象 VTuber</th>
-              <th className="text-end">応援額</th>
-              <th style={{ width: "30px" }}></th>
-            </>
-          )}
-        </tr>
-      </thead>
+    case "supporter-only":
+      return <EntityAmountTable entity="supporter" list={list} />;
 
-      <tbody>
-        {list.map((item, i) =>
-          mode === "youtuber" ? (
-            <YoutuberTableRow key={item.youtuberId} rank={i + 1} data={item} />
-          ) : (
-            <SupporterTableRow key={item.supporterId} rank={i + 1} data={item} />
-          )
-        )}
-      </tbody>
-    </table>
-  );
+    case "youtuber-only":
+      return <EntityAmountTable entity="youtuber" list={list} />;
+
+    case "video-only":                                  // ★ added
+      return <VideoTable list={list} />;
+
+    default:
+      return null;
+  }
 }

@@ -1,0 +1,252 @@
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📂 **backend/youtube_api.py**
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```python
+import requests
+from typing import Optional, Dict, Any
+
+from config import YOUTUBE_API_KEY
+
+class YouTubeAPI:
+    BASE_URL = "https://www.googleapis.com/youtube/v3"
+
+    def __init__(self, api_key: Optional[str] = None):
+        self.api_key = api_key or YOUTUBE_API_KEY
+
+    # ───────────────────────────────────────────────
+    #  ★ 改修: dict で動画メタを返す
+    # ───────────────────────────────────────────────
+    def get_video_details(self, video_id: str) -> Optional[Dict[str, Any]]:
+        """Return rich dict with title / thumbnail / publishedAt etc."""
+        url = (
+            f"{self.BASE_URL}/videos?part=liveStreamingDetails,statistics,status,"
+            f"topicDetails,localizations,snippet,contentDetails&id={video_id}&key={self.api_key}"
+        )
+        data = requests.get(url, timeout=30).json()
+        if "items" not in data or not data["items"]:
+            return None
+        item = data["items"][0]
+        snippet = item["snippet"]
+        return {
+            "videoId": video_id,
+            "title": snippet["title"],
+            "thumbnailUrl": snippet["thumbnails"]["default"]["url"],
+            "publishedAt": snippet["publishedAt"],
+            "channelId": snippet["channelId"],
+            "raw": item,  # keep for compatibility if other fields needed
+        }
+```
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📂 **backend/admin_tasks.py**（抜粋: update_for_each_video / update_supporter）
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```python
+# ･･･ 略 ･･･
+
+def update_for_each_video(youtuber_info, video):
+    try:
+        vid_info = youtube_api.get_video_details(video["id"])
+        if not vid_info:
+            logger.warning(f"video details not found for {video['id']}")
+            return
+        video_id = vid_info["videoId"]
+        published_at = vid_info["publishedAt"]
+        yyyy_mm = published_at[:7].replace("-", "_")  # e.g. 2025_04
+
+        # superchat 解析
+        yt_url = f"https://www.youtube.com/watch?v={video_id}"
+        time.sleep(30)
+        all_supporters_info, video_total_earning = get_superchats_with_retry(yt_url)
+        if all_supporters_info is None:
+            # 略 (既存コード)
+            return
+
+        # ★ 動画 Doc 書き込み (VTuber 側)
+        db.collection("youtubers").document(youtuber_info["youtuber_id"])\
+          .collection("months").document(yyyy_mm)\
+          .set({"totalAmount": firestore.Increment(video_total_earning)}, merge=True)
+
+        db.collection("youtubers").document(youtuber_info["youtuber_id"])\
+          .collection("months").document(yyyy_mm)\
+          .collection("videos").document(video_id)\
+          .set({
+              "videoId": video_id,
+              "title": vid_info["title"],
+              "thumbnailUrl": vid_info["thumbnailUrl"],
+              "publishedAt": published_at,
+              "amount": video_total_earning,
+          }, merge=True)
+
+        # 既存まとめの後、各サポーター処理へ渡す
+        for _, supporter in all_supporters_info.items():
+            update_supporter(supporter, '_' + published_at[:4], '_' + published_at[5:7], supporter['amount'],
+                             youtuber_info['youtuber_id'], video_id, vid_info)
+    except Exception as e:
+        logger.error(f"Unexpected error in update_for_each_video: {str(e)}")
+        sys.exit(1)
+```
+
+```python
+#   update_supporter 変更部
+
+def update_supporter(supporter, _year, _month, amount, youtuber_id, video_id, vid_info):
+    # ･･･ 既存処理保持 ･･･
+    yyyy_mm = (_year+_month).lstrip('_')  # '2025_04'
+
+    # ★ Supporter → months/donations 追記
+    month_ref = db.collection("supporters").document(supporter_id)\
+                 .collection("months").document(yyyy_mm)
+    month_ref.set({"totalAmount": firestore.Increment(amount)}, merge=True)
+    month_ref.collection("donations").document(video_id).set({
+        "youtuberId": youtuber_id,
+        "amount": firestore.Increment(amount),
+        "publishedAt": vid_info["publishedAt"],
+        "videoTitle": vid_info["title"],
+        "thumbnailUrl": vid_info["thumbnailUrl"],
+    }, merge=True)
+```
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📂 **backend/main.py**（Flask 抜粋: 新エンドポイント）
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```python
+from flask import Flask, request, jsonify
+from cache import cache_response      # 既存キャッシュデコレータ
+from firebase_admin import firestore
+
+app = Flask(__name__)
+
+db = firestore.client()
+
+# ────────────────────────────────
+#  ★ 新 API: VTuber 月動画ランキング
+# ────────────────────────────────
+@app.post('/api/getYoutuberVideosRanking')
+@cache_response(lambda b: f"videos:{b['youtuberId']}:{b['year']}_{b['month']}")
+def get_youtuber_videos_ranking():
+    body = request.get_json()
+    yid   = body['youtuberId']
+    yyyy_mm = f"{body['year']}_{str(body['month']).zfill(2)}"
+
+    docs = db.collection('youtubers').document(yid)\
+              .collection('months').document(yyyy_mm)\
+              .collection('videos').order_by('amount', direction=firestore.Query.DESCENDING)\
+              .limit(100).stream()
+    res = []
+    for idx, d in enumerate(docs, 1):
+        v = d.to_dict()
+        res.append({
+            'rank': idx,
+            'videoId': v['videoId'],
+            'title': v['title'],
+            'thumbnailUrl': v['thumbnailUrl'],
+            'amount': v['amount'],
+        })
+    return jsonify(res)
+```
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📂 **frontend/lib/api.js**（新関数）
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```javascript
+// 既存 axios インスタンス import 済みと仮定
+export const getYoutuberVideosRanking = (youtuberId, year, month) =>
+  axios.post('/api/getYoutuberVideosRanking', { youtuberId, year, month })
+       .then(res => res.data);
+```
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📂 **frontend/components/VideoTableRow.jsx**
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```jsx
+"use client";
+import Link from "next/link";
+import { showMoney } from "@/app/lib/useful";
+
+export default function VideoTableRow({ rank, data }) {
+  return (
+    <tr className="border-bottom">
+      <td className="text-muted fw-semibold">{rank}</td>
+      {/* サムネ + タイトル */}
+      <td>
+        <Link href={`https://www.youtube.com/watch?v=${data.videoId}`} target="_blank" className="d-flex align-items-center gap-2 text-decoration-none text-dark">
+          <img src={data.thumbnailUrl} width={40} height={25} alt={data.title} style={{objectFit:'cover'}} />
+          <span>{data.title}</span>
+        </Link>
+      </td>
+      {/* 金額 */}
+      <td className="text-end fw-semibold">{showMoney(data.amount)}</td>
+    </tr>
+  );
+}
+```
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📂 **frontend/components/RankingTable2.js**（variant 拡張）
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```jsx
+"use client";
+import YoutuberTableRow  from "./YoutuberTableRow";
+import SupporterTableRow from "./SupporterTableRow";
+import VideoTableRow     from "./VideoTableRow";   // ★ new
+
+export default function RankingTable({ list, variant }) {
+  return (
+    <table className="table table-hover align-middle">
+      <thead className="table-light">
+        <tr>
+          <th style={{ width: "60px" }}>#</th>
+
+          {variant === "youtuber" && <><th>VTuber</th><th className="text-end">応援額</th></>}
+          {variant === "supporter" && <><th>Supporter</th><th>対象 VTuber</th><th className="text-end">応援額</th></>}
+          {variant === "video" && <><th>動画</th><th className="text-end">応援額</th></>}
+        </tr>
+      </thead>
+      <tbody>
+        {list.map((item, i) => {
+          if (variant === "youtuber")   return <YoutuberTableRow  key={i} rank={i+1} data={item}/>;
+          if (variant === "supporter")  return <SupporterTableRow key={i} rank={i+1} data={item}/>;
+          if (variant === "video")      return <VideoTableRow     key={i} rank={i+1} data={item}/>;
+        })}
+      </tbody>
+    </table>
+  );
+}
+```
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📂 **frontend/YoutuberDetailsClient.js**（抜粋）
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```jsx
+// ･･･ 既存 import
+import { getYoutuberVideosRanking } from "@/app/lib/api";  // ★ new
+
+export default function YoutuberDetailsClient({ initialData, params }) {
+  // ･･･ 既存 state
+  const [showVideos, setShowVideos] = useState(false);           // ★ new
+  const [videos, setVideos]         = useState([]);              // ★ new
+
+  // 既存 useEffect に加え videos fetch
+  useEffect(() => {
+    if (!showVideos) return;
+    setLoading(true);
+    getYoutuberVideosRanking(params.youtuberId, selectedYear, selectedMonth)
+      .then(setVideos)
+      .finally(() => setLoading(false));
+  }, [showVideos, selectedYear, selectedMonth, params.youtuberId]);
+
+  // UI: 切替ボタン
+  <div className="btn-group mb-3 ms-3">
+    <button className={`btn btn-outline-primary ${!showVideos && "active"}`} onClick={() => setShowVideos(false)}>Supporters</button>
+    <button className={`btn btn-outline-primary ${showVideos && "active"}`} onClick={() => setShowVideos(true)}>Videos</button>
+  </div>
+
+  {/* ランキング表示 */}
+  {!loading && (
+    <RankingTable
+      variant={showVideos ? "video" : "supporter"}
+      list={showVideos ? videos : supporters}
+    />
+  )}
+}
+```

@@ -41,3 +41,5 @@ backend/*.tsbuildinfo
 backend/next-env.d.ts
 
 scripts/ranking-app-bf2df-firebase-adminsdk-vtb8n-d6b04bb9a6.json
+
+./memo.txt

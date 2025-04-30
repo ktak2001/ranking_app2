@@ -107,25 +107,30 @@ if IS_CLOUD_RUN:
 def test_app_engine():
     return jsonify({"message": True})
 
-# @cache_firestore()
-# def get_youtubers():
-#     youtubers_docs = db.collection('youtubers').stream()
-#     youtubers_list = []
-#     for youtuber_doc in youtubers_docs:
-#         youtuber = youtuber_doc.to_dict()
-#         youtubers_list.append({
-#             "amount": youtuber['totalAmount'],
-#             "youtuberName": youtuber['youtuberName'],
-#             "youtuberId": youtuber['youtuberId'],
-#             "youtuberIconUrl": youtuber['youtuberIconUrl']
-#         })
-#     logging.info(f"youtubers: {youtubers_list}")
-#     return jsonify(youtubers_list)
+@app.post('/api/getYoutuberVideosRanking')
+def getYoutuberVideosRanking():
+    body = request.get_json()
+    yid   = body['youtuberId']
+    yyyy_mm = f"{body['year']}_{str(body['month']).zfill(2)}"
+    return get_youtuber_videos_ranking(yid, yyyy_md)
 
-# @app.route("/api/youtubers")
-# def getYoutubers():
-#     return get_youtubers()
-
+@cache_with_persistence()
+def get_youtuber_videos_ranking(yid, yyyy_md):
+    docs = db.collection('youtubers').document(yid)\
+              .collection('months').document(yyyy_mm)\
+              .collection('videos').order_by('amount', direction=firestore.Query.DESCENDING)\
+              .limit(100).stream()
+    res = []
+    for idx, d in enumerate(docs, 1):
+        v = d.to_dict()
+        res.append({
+            'rank': idx,
+            'videoId': v['videoId'],
+            'title': v['title'],
+            'thumbnailUrl': v['thumbnailUrl'],
+            'amount': v['amount'],
+        })
+    return jsonify(res)
 
 def get_supporter_detail(supporter_id):
     api_str = "https://youtube.googleapis.com/youtube/v3/channels?part=snippet&id={0}&key={1}"

@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import TabNavigation  from '@/components/TabNavigation.js';
-import RankingTable   from '@/components/RankingTable2.js';      // ★ 追加
-import { getSupportersRanking } from '@/app/lib/api.js';        // ★ 追加
+import RankingTable   from '@/components/RankingTable.js';      // ★ 追加
+import { getSupportersRanking, getYoutuberVideosRanking } from '@/app/lib/api.js';        // ★ 追加
 import { useAuth }    from '@/app/lib/auth.js';
 import { yearMonth, showMoney } from '@/app/lib/useful.js';     // ★ showMoney を追加
 import SafeImage      from '@/components/SafeImage.js';
@@ -17,7 +17,9 @@ export default function YoutuberDetailsClient({ initialData, params }) {
   const [selectedYear,  setSelectedYear]  = useState(thisYear);
   const [selectedMonth, setSelectedMonth] = useState(thisMonthStr);
   const [showYear,      setShowYear]      = useState(false);
-  const [loading,       setLoading]       = useState(false);                     // ★
+  const [loading,       setLoading]       = useState(false);
+  const [showVideos,   setShowVideos]   = useState(false);
+  const [videoList,    setVideoList]    = useState([]);
   const [topSupporters, setTopSupporters] = useState(initialData.rankingData.top_supporters); // ★
   const [totalAmount,   setTotalAmount]   = useState(initialData.rankingData.total_amount);   // ★
 
@@ -41,12 +43,21 @@ export default function YoutuberDetailsClient({ initialData, params }) {
   /* ---------- ランキング再取得 ---------- */
   useEffect(() => {                                                            // ★
     setLoading(true);
-    getSupportersRanking(selectedYear, selectedMonth, params.youtuberId, showYear)
-      .then(data => {
-        setTopSupporters(data.top_supporters);
-        setTotalAmount(data.total_amount);
-      })
-      .finally(() => setLoading(false));
+    if (!showVideos) {
+      getSupportersRanking(selectedYear, selectedMonth, params.youtuberId, showYear)
+        .then(data => {
+          setTopSupporters(data.top_supporters);
+          setTotalAmount(data.total_amount);
+        })
+        .finally(() => setLoading(false));
+    } else {
+      getYoutuberVideosRanking(selectedYear, selectedMonth, params.youtuberId, showYear)
+        .then(({ videos, total_amount }) => {
+          setVideoList(videos)
+          setTotalAmount(total_amount)
+        })
+        .finally(() => setLoading(false))
+    }
   }, [selectedYear, selectedMonth, showYear, params.youtuberId]);
 
   /* ---------- UI ---------- */
@@ -89,6 +100,23 @@ export default function YoutuberDetailsClient({ initialData, params }) {
         setShowYear={setShowYear}
       />
 
+      <div className="mb-3">
+        <div className="btn-group">
+          <button
+            className={`btn btn-outline-primary ${!showVideos && "active"}`}
+            onClick={() => setShowVideos(false)}
+          >
+            Supporters
+          </button>
+          <button
+            className={`btn btn-outline-primary ${showVideos && "active"}`}
+            onClick={() => setShowVideos(true)}
+          >
+            Videos
+          </button>
+        </div>
+      </div>
+
       {/* 合計金額 */}
       <div className="ms-3 mb-2">
         <h3>{showMoney(totalAmount)}</h3>
@@ -98,8 +126,8 @@ export default function YoutuberDetailsClient({ initialData, params }) {
       {loading && <p className="text-center">Loading…</p>}
       {!loading && (
         <RankingTable
-          variant="supporter-only"          /* Supporter と応援額のみ */
-          list={topSupporters}
+          variant={showVideos ? "video-only" : "supporter-only"}
+          list={showVideos ? videoList : topSupporters}
         />
       )}
     </div>

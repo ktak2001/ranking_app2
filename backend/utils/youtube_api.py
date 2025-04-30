@@ -1,4 +1,5 @@
 import requests
+from typing import Optional, Dict, Any
 from config import YOUTUBE_API_KEY
 from chat_downloader import ChatDownloader
 from utils.common import get_currency_json, pretty_json
@@ -7,19 +8,31 @@ import logging
 class YouTubeAPI:
   BASE_URL = "https://www.googleapis.com/youtube/v3"
 
-  def __init__(self, api_key=YOUTUBE_API_KEY):
-    self.api_key = api_key
+  def __init__(self, api_key: Optional[str] = None):
+      self.api_key = api_key or YOUTUBE_API_KEY
 
-  def get_channel_info(self, channel_id):
-    url = f"{self.BASE_URL}/channels?part=contentDetails,snippet&id={channel_id}&key={self.api_key}"
-    response = requests.get(url).json()
-    item = response["items"][0]
-    return {
-      "uploads_id": item["contentDetails"]["relatedPlaylists"]["uploads"],
-      "youtuber_icon_url": item['snippet']['thumbnails']['medium']['url'],
-      "youtuber_name": item['snippet']['title'],
-      "youtuber_custom_url": item['snippet']['customUrl']
-    }
+  # ───────────────────────────────────────────────
+  #  ★ 改修: dict で動画メタを返す
+  # ───────────────────────────────────────────────
+  def get_video_details(self, video_id: str) -> Optional[Dict[str, Any]]:
+      """Return rich dict with title / thumbnail / publishedAt etc."""
+      url = (
+          f"{self.BASE_URL}/videos?part=liveStreamingDetails,statistics,status,"
+          f"topicDetails,localizations,snippet,contentDetails&id={video_id}&key={self.api_key}"
+      )
+      data = requests.get(url, timeout=30).json()
+      if "items" not in data or not data["items"]:
+          return None
+      item = data["items"][0]
+      snippet = item["snippet"]
+      return {
+          "videoId": video_id,
+          "title": snippet["title"],
+          "thumbnailUrl": snippet["thumbnails"]["default"]["url"],
+          "publishedAt": snippet["publishedAt"],
+          "channelId": snippet["channelId"],
+          "raw": item,  # keep for compatibility if other fields needed
+      }
 
   def get_playlist_items(self, playlist_id, max_results=50, page_token=None):
     url = f"{self.BASE_URL}/playlistItems?part=contentDetails&maxResults={max_results}&playlistId={playlist_id}&key={self.api_key}"
@@ -27,9 +40,9 @@ class YouTubeAPI:
       url += f"&pageToken={page_token}"
     return requests.get(url).json()
 
-  def get_video_details(self, video_id):
-    url = f"{self.BASE_URL}/videos?part=liveStreamingDetails,statistics,status,topicDetails,localizations,snippet,contentDetails&id={video_id}&key={self.api_key}"
-    return requests.get(url).json()['items'][0]
+  # def get_video_details(self, video_id):
+  #   url = f"{self.BASE_URL}/videos?part=liveStreamingDetails,statistics,status,topicDetails,localizations,snippet,contentDetails&id={video_id}&key={self.api_key}"
+  #   return requests.get(url).json()['items'][0]
 
   def get_videos_until_date(self, youtuber_id, YEAR, MONTH, DAY):
     channel_info = self.get_channel_info(youtuber_id)

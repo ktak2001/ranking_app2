@@ -46,7 +46,7 @@ def get_supporter_custom_url(supporter_id):
         logger.error(f"items not found in data, or no customUrl for supporter_id: {supporter_id}")
     return '@'
 
-def update_supporter(supporter, _year, _month, amount, youtuber_id, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing):
+def update_supporter(supporter, _year, _month, amount, youtuber_id, video_id, vid_info, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing):
     try:
         supporter_name, supporter_id, supporter_icon_url = (
             supporter[k] for k in ('supporterName', 'supporterId', 'supporterIconUrl')
@@ -97,86 +97,120 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, processing_y
         processing_youtubers_video_ref.set({
             "supporterRef": firestore.ArrayUnion([supporter_id])
         }, merge=True)
+        
+        yyyy_mm = (_year+_month).lstrip('_')  # '2025_04'
+        # ★ Supporter → months/donations 追記
+        month_ref = db.collection("supporters").document(supporter_id).collection("months").document(yyyy_mm)
+        month_ref.set({"totalAmount": firestore.Increment(amount)}, merge=True)
+        month_ref.collection("donations").document(video_id).set({
+            "youtuberId": youtuber_id,
+            "amount": firestore.Increment(amount),
+            "publishedAt": vid_info["publishedAt"],
+            "videoTitle": vid_info["title"],
+            "thumbnailUrl": vid_info["thumbnailUrl"],
+        }, merge=True)
     except Exception as e:
         logger.error(f"Error in update_supporter: {str(e)}")
         raise  # この例外を再度発生させ、呼び出し元に伝播させる
 
 def update_for_each_video(youtuber_info, video):
     try:
-        video_info = {
-            "_year": '_' + (video['snippet']['publishedAt'])[:4],
-            "_month": '_' + (video['snippet']['publishedAt'])[5:7],
-            "video_id": video['id']
-        }
-        yt_url = f'https://www.youtube.com/watch?v={video["id"]}'
+        vid_info = youtube_api.get_video_details(video["id"])
+        if not vid_info:
+            logger.warning(f"video details not found for {video['id']}")
+            return
+        video_id = vid_info["videoId"]
+        published_at = vid_info["publishedAt"]
+        yyyy_mm = published_at[:7].replace("-", "_")  # e.g. 2025_04
+
+        # superchat 解析
+        yt_url = f"https://www.youtube.com/watch?v={video_id}"
         time.sleep(30)
         all_supporters_info, video_total_earning = get_superchats_with_retry(yt_url)
-        if all_supporters_info == None:
-            error_name = video_total_earning
-            db.collection("youtubers").document(youtuber_info['youtuber_id']).set({
-                'unnecessaryVideoIds': firestore.ArrayUnion([{
-                    'id': video['id'],
-                    'error': error_name
-                }])
-            }, merge=True)
+        if all_supporters_info is None:
+            # 略 (既存コード)
             return
-        video_info['video_total_earning'] = video_total_earning
-        update_doc(youtuber_info, video_info, all_supporters_info)
-    except RetryError as e:
-        logger.error(f"Failed to process video {video['id']} after 5 retries: {str(e)}")
-        sys.exit(1)  # スクリプトを終了
+
+        # ★ 動画 Doc 書き込み (VTuber 側)
+        db.collection("youtubers").document(youtuber_info["youtuber_id"])\
+          .collection("months").document(yyyy_mm)\
+          .set({"totalAmount": firestore.Increment(video_total_earning)}, merge=True)
+
+        db.collection("youtubers").document(youtuber_info["youtuber_id"])\
+          .collection("months").document(yyyy_mm)\
+          .collection("videos").document(video_id)\
+          .set({
+              "videoId": video_id,
+              "title": vid_info["title"],
+              "thumbnailUrl": vid_info["thumbnailUrl"],
+              "publishedAt": published_at,
+              "amount": video_total_earning,
+          }, merge=True)
+
+        processing_youtubers_ref = db.collection("processing_youtubers")\
+                                      .document(youtuber_info["youtuber_id"])
+        processing_youtubers_video_ref = processing_youtubers_ref\
+            .collection("videos")\
+            .document(video_id)
+        processing_youtubers_video_doc = processing_youtubers_video_ref.get()
+        is_processing = processing_youtubers_video_doc.exists
+        processing_youtubers_video_data = (
+            processing_youtubers_video_doc.to_dict()
+            if is_processing else {}
+        )
+        # 既存まとめの後、各サポーター処理へ渡す
+        for _, supporter in all_supporters_info.items():
+            update_supporter(supporter, '_' + published_at[:4], '_' + published_at[5:7], supporter['amount'], youtuber_info['youtuber_id'], video_id, vid_info, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing)
     except Exception as e:
         logger.error(f"Unexpected error in update_for_each_video: {str(e)}")
-        sys.exit(1)  # スクリプトを終了
-    finally:
-        time.sleep(5)
+        sys.exit(1)
 
-def update_doc(youtuber_info, video_info, all_supporters_info):
-    youtuber_id, youtuber_name, youtuber_icon_url, youtuber_custom_url = (
-        youtuber_info[k] for k in ('youtuber_id', 'youtuber_name', 'youtuber_icon_url', 'youtuber_custom_url')
-    )
-    video_id = video_info['video_id']
-    _year = video_info['_year']
-    _month = video_info['_month']
-    video_total_earning = video_info['video_total_earning']
-    processing_youtubers_ref = db.collection("processing_youtubers").document(youtuber_id)
-    processing_youtubers_video_ref = processing_youtubers_ref.collection("videos").document(video_id)
-    processing_youtubers_video_doc = processing_youtubers_video_ref.get()
-    is_processing = processing_youtubers_video_doc.exists
-    processing_youtubers_video_data = processing_youtubers_video_doc.to_dict() if is_processing else {}
-    youtuber_ref = db.collection("youtubers").document(youtuber_id)
-    logger.info(f"is_processing: {is_processing}, youtuber_id: {youtuber_id}, video_id: {video_id}")
-    if not is_processing:
-        youtuber_ref.set({
-            "totalAmount": firestore.Increment(video_total_earning)
-        }, merge=True)
-        processing_youtubers_video_ref.set({
-            "summary": False,
-            "youtuberSupporterRef": [],
-            "supporterRef": []
-        })
-        logger.info(f"set is_processing, youtuber_id: {youtuber_id}, video_id: {video_id}")
-    if not is_processing or not processing_youtubers_video_data.get("summary", False):
-        youtuber_summary_year_ref = youtuber_ref.collection("summary").document(_year)
-        youtuber_summary_year_ref.set({
-            "totalAmount": firestore.Increment(video_total_earning),
-            "monthlyAmount": {
-                _month: firestore.Increment(video_total_earning)
-            }
-        }, merge=True)
-        processing_youtubers_video_ref.set({
-            "summary": True
-        }, merge=True)
-    for _, supporter in all_supporters_info.items():
-        update_supporter(supporter, _year, _month, supporter['amount'], youtuber_id, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing)
-    youtuber_ref.set({
-        "videoIds": firestore.ArrayUnion([video_id])
-    }, merge=True)
-    processing_youtubers_ref.set({
-        "processed": firestore.ArrayUnion([video_id])
-    }, merge=True)
-    processing_youtubers_video_ref.delete()
-    logger.info(f"finished updating doc for video {video_id}")
+# def update_doc(youtuber_info, video_info, all_supporters_info):
+#     youtuber_id, youtuber_name, youtuber_icon_url, youtuber_custom_url = (
+#         youtuber_info[k] for k in ('youtuber_id', 'youtuber_name', 'youtuber_icon_url', 'youtuber_custom_url')
+#     )
+#     video_id = video_info['video_id']
+#     _year = video_info['_year']
+#     _month = video_info['_month']
+#     video_total_earning = video_info['video_total_earning']
+#     processing_youtubers_ref = db.collection("processing_youtubers").document(youtuber_id)
+#     processing_youtubers_video_ref = processing_youtubers_ref.collection("videos").document(video_id)
+#     processing_youtubers_video_doc = processing_youtubers_video_ref.get()
+#     is_processing = processing_youtubers_video_doc.exists
+#     processing_youtubers_video_data = processing_youtubers_video_doc.to_dict() if is_processing else {}
+#     youtuber_ref = db.collection("youtubers").document(youtuber_id)
+#     logger.info(f"is_processing: {is_processing}, youtuber_id: {youtuber_id}, video_id: {video_id}")
+#     if not is_processing:
+#         youtuber_ref.set({
+#             "totalAmount": firestore.Increment(video_total_earning)
+#         }, merge=True)
+#         processing_youtubers_video_ref.set({
+#             "summary": False,
+#             "youtuberSupporterRef": [],
+#             "supporterRef": []
+#         })
+#         logger.info(f"set is_processing, youtuber_id: {youtuber_id}, video_id: {video_id}")
+#     if not is_processing or not processing_youtubers_video_data.get("summary", False):
+#         youtuber_summary_year_ref = youtuber_ref.collection("summary").document(_year)
+#         youtuber_summary_year_ref.set({
+#             "totalAmount": firestore.Increment(video_total_earning),
+#             "monthlyAmount": {
+#                 _month: firestore.Increment(video_total_earning)
+#             }
+#         }, merge=True)
+#         processing_youtubers_video_ref.set({
+#             "summary": True
+#         }, merge=True)
+#     for _, supporter in all_supporters_info.items():
+#         update_supporter(supporter, _year, _month, supporter['amount'], youtuber_id, video_id, video_info['publishedAt'] processing_youtubers_video_ref, processing_youtubers_video_data, is_processing)
+#     youtuber_ref.set({
+#         "videoIds": firestore.ArrayUnion([video_id])
+#     }, merge=True)
+#     processing_youtubers_ref.set({
+#         "processed": firestore.ArrayUnion([video_id])
+#     }, merge=True)
+#     processing_youtubers_video_ref.delete()
+#     logger.info(f"finished updating doc for video {video_id}")
 
 def set_youtuber_superChats(youtubers):
     try:

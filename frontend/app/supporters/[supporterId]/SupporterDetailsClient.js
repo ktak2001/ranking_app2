@@ -7,7 +7,7 @@ import YoutuberCard from '@/components/YoutuberCards.js';
 import { getSupportingYoutubers } from '@/app/lib/api.js';
 import { yearMonth } from '@/app/lib/useful.js';
 import SafeImage from "@/components/SafeImage.js";
-import RankingTable from '@/components/RankingTable2.js';
+import RankingTable from '@/components/RankingTable.js';
 
 export default function SupporterDetailsClient({ supporterInfo, params }) {
   /* ---------- 現在年月 ---------- */
