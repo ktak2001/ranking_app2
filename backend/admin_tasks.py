@@ -75,6 +75,17 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, video_id, vi
                 _year: new_amount
             },
         }, merge=True)
+        yyyy_mm = (_year+_month).lstrip('_')  # '2025_04'
+        # ★ Supporter → months/donations 追記
+        month_ref = db.collection("supporters").document(supporter_id).collection("months").document(yyyy_mm)
+        month_ref.set({"totalAmount": firestore.Increment(amount)}, merge=True)
+        month_ref.collection("donations").document(video_id).set({
+            "youtuberId": youtuber_id,
+            "amount": firestore.Increment(amount),
+            "publishedAt": vid_info["publishedAt"],
+            "videoTitle": vid_info["title"],
+            "thumbnailUrl": vid_info["thumbnailUrl"],
+        }, merge=True)
         processing_youtubers_video_ref.set({
             "youtuberSupporterRef": firestore.ArrayUnion([supporter_id])
         }, merge=True)
@@ -96,18 +107,6 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, video_id, vi
         }, merge=True)
         processing_youtubers_video_ref.set({
             "supporterRef": firestore.ArrayUnion([supporter_id])
-        }, merge=True)
-        
-        yyyy_mm = (_year+_month).lstrip('_')  # '2025_04'
-        # ★ Supporter → months/donations 追記
-        month_ref = db.collection("supporters").document(supporter_id).collection("months").document(yyyy_mm)
-        month_ref.set({"totalAmount": firestore.Increment(amount)}, merge=True)
-        month_ref.collection("donations").document(video_id).set({
-            "youtuberId": youtuber_id,
-            "amount": firestore.Increment(amount),
-            "publishedAt": vid_info["publishedAt"],
-            "videoTitle": vid_info["title"],
-            "thumbnailUrl": vid_info["thumbnailUrl"],
         }, merge=True)
     except Exception as e:
         logger.error(f"Error in update_supporter: {str(e)}")
@@ -153,11 +152,8 @@ def update_for_each_video(youtuber_info, video):
               "amount": video_total_earning,
           }, merge=True)
 
-        processing_youtubers_ref = db.collection("processing_youtubers")\
-                                      .document(youtuber_info["youtuber_id"])
-        processing_youtubers_video_ref = processing_youtubers_ref\
-            .collection("videos")\
-            .document(video_id)
+        processing_youtubers_ref = db.collection("processing_youtubers").document(youtuber_info["youtuber_id"])
+        processing_youtubers_video_ref = processing_youtubers_ref.collection("videos").document(video_id)
         processing_youtubers_video_doc = processing_youtubers_video_ref.get()
         is_processing = processing_youtubers_video_doc.exists
         processing_youtubers_video_data = (
