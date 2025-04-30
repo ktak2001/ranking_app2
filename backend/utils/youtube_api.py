@@ -5,6 +5,8 @@ from chat_downloader import ChatDownloader
 from utils.common import get_currency_json, pretty_json
 import logging
 
+logger = logging.getLogger(__name__)
+
 class YouTubeAPI:
   BASE_URL = "https://www.googleapis.com/youtube/v3"
 
@@ -22,6 +24,7 @@ class YouTubeAPI:
       )
       data = requests.get(url, timeout=30).json()
       if "items" not in data or not data["items"]:
+          logger.error(f"cannnot find video: {video_id}")
           return None
       item = data["items"][0]
       snippet = item["snippet"]
