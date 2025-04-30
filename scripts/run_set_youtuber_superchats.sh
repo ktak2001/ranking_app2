@@ -1,6 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
+cd /Users/takehikazuki/Desktop/my_app3/ranking_app
+
+# 変更をステージングしてコミット
+git add .
+git commit -m "Auto sync before superchats run" || echo "No changes to commit"
+
+# リモートへプッシュ
+git push
+
+cd /Users/takehikazuki/Desktop/my_app3/ranking_app/scripts
 # ───────────────────────────────
 # 変数
 # ───────────────────────────────
