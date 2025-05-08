@@ -1,0 +1,4 @@
+admin_tasks.pyのset_youtuber_superChats関数の実行によって、firestoreのデータ構造はどのようなものになるかを予想してほしい。
+
+またその際、main.pyの関数について、明らかに挙動がおかしくなるようなものをリストアップしてほしい。
+個人的に、get_supporters_rankingやget_youtubers_rankingは挙動がおかしくなりそう。

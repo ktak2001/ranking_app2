@@ -20,7 +20,7 @@ export default function YoutuberDetailsClient({ initialData, params }) {
   const [loading,       setLoading]       = useState(false);
   const [showVideos,   setShowVideos]   = useState(false);
   const [videoList,    setVideoList]    = useState([]);
-  const [topSupporters, setTopSupporters] = useState(initialData.rankingData.top_supporters); // ★
+  const [topSupporters, setTopSupporters] = useState(initialData.rankingData.top_supporters ?? []); // ★
   const [totalAmount,   setTotalAmount]   = useState(initialData.rankingData.total_amount);   // ★
 
   /* ---------- 選択可能な年・月 ---------- */
@@ -39,27 +39,23 @@ export default function YoutuberDetailsClient({ initialData, params }) {
 
   const [isProduction, setIsProduction] = useState(false);
   useEffect(() => { setIsProduction(process.env.NODE_ENV === 'production'); }, []);
-
   /* ---------- ランキング再取得 ---------- */
   useEffect(() => {                                                            // ★
     setLoading(true);
-    if (!showVideos) {
-      getSupportersRanking(selectedYear, selectedMonth, params.youtuberId, showYear)
-        .then(data => {
-          setTopSupporters(data.top_supporters);
-          setTotalAmount(data.total_amount);
-        })
-        .finally(() => setLoading(false));
-    } else {
-      getYoutuberVideosRanking(selectedYear, selectedMonth, params.youtuberId, showYear)
-        .then(({ videos, total_amount }) => {
-          setVideoList(videos)
-          setTotalAmount(total_amount)
-        })
-        .finally(() => setLoading(false))
-    }
+    getSupportersRanking(selectedYear, selectedMonth, params.youtuberId, showYear)
+      .then(data => {
+        setTopSupporters(data.top_supporters);
+        setTotalAmount(data.total_amount);
+      })
+      .then(() => {
+        getYoutuberVideosRanking(selectedYear, selectedMonth, params.youtuberId, showYear)
+          .then((videos) => {
+            setVideoList(videos)
+          })
+          .finally(() => setLoading(false))
+      })
   }, [selectedYear, selectedMonth, showYear, params.youtuberId]);
-
+  console.log({initialData})
   /* ---------- UI ---------- */
   return (
     <div className="mt-4 pt-5">

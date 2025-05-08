@@ -19,8 +19,7 @@ class YouTubeAPI:
   def get_video_details(self, video_id: str) -> Optional[Dict[str, Any]]:
       """Return rich dict with title / thumbnail / publishedAt etc."""
       url = (
-          f"{self.BASE_URL}/videos?part=liveStreamingDetails,statistics,status,"
-          f"topicDetails,localizations,snippet,contentDetails&id={video_id}&key={self.api_key}"
+          f"{self.BASE_URL}/videos?part=liveStreamingDetails,statistics,status,topicDetails,localizations,snippet,contentDetails&id={video_id}&key={self.api_key}"
       )
       data = requests.get(url, timeout=30).json()
       if "items" not in data or not data["items"]:

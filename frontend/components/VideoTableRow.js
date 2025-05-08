@@ -9,7 +9,6 @@ export default function VideoTable({ list }) {
       <thead className="table-light">
         <tr>
           <th style={{ width: "60px" }}>#</th>
-          <th>VTuber</th>
           <th>動画</th>
           <th className="text-end">応援額</th>
         </tr>
@@ -19,9 +18,6 @@ export default function VideoTable({ list }) {
           <tr key={item.videoId}>
             {/* rank */}
             <td className="text-muted fw-semibold">{i + 1}</td>
-
-            {/* VTuber name */}
-            <td>{item.youtuberName}</td>
 
             {/* thumbnail + title */}
             <td>

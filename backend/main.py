@@ -111,13 +111,13 @@ def test_app_engine():
 def getYoutuberVideosRanking():
     body = request.get_json()
     yid   = body['youtuberId']
-    yyyy_mm = f"{body['year']}_{str(body['month']).zfill(2)}"
-    return get_youtuber_videos_ranking(yid, yyyy_md)
+    _yyyy_mm = f"_{body['year']}_{str(body['month']).zfill(2)}"
+    return get_youtuber_videos_ranking(yid, _yyyy_mm)
 
 @cache_with_persistence()
-def get_youtuber_videos_ranking(yid, yyyy_md):
+def get_youtuber_videos_ranking(yid, _yyyy_mm):
     docs = db.collection('youtubers').document(yid)\
-              .collection('months').document(yyyy_mm)\
+              .collection('months').document(_yyyy_mm)\
               .collection('videos').order_by('amount', direction=firestore.Query.DESCENDING)\
               .limit(100).stream()
     res = []
@@ -130,7 +130,8 @@ def get_youtuber_videos_ranking(yid, yyyy_md):
             'thumbnailUrl': v['thumbnailUrl'],
             'amount': v['amount'],
         })
-    return jsonify(res)
+    print("res of videos", res)
+    return res
 
 def get_supporter_detail(supporter_id):
     api_str = "https://youtube.googleapis.com/youtube/v3/channels?part=snippet&id={0}&key={1}"
@@ -179,34 +180,52 @@ def getYoutubersRanking():
 
 @cache_with_persistence()
 def get_youtubers_ranking(year, month, showYear):
-    youtubers_docs = db.collection('youtubers').stream()
+    """
+    year : '_YYYY'
+    month: '_MM'
+    showYear: bool
+    """
     ranking_list = []
-    logging.info(f"showYear: {showYear}")
+    for youtuber_doc in db.collection("youtubers").stream():
+        y = youtuber_doc.to_dict()
+        yid = y.get("youtuberId")
 
-    for youtuber_doc in youtubers_docs:
-        youtuber = youtuber_doc.to_dict()
-        # print("youtuber", pretty_json(youtuber))
-        youtuber_summary_doc = db.collection('youtubers').document(youtuber['youtuberId']).collection('summary').document(year).get()
-        
-        if not youtuber_summary_doc.exists:
-            continue
+        # ―― 年間集計 or 月間集計 ――
         if showYear:
-          amount = (youtuber_summary_doc.to_dict()).get('totalAmount', 0)
+            # 年間は months サブコレの全 month ドキュメントを合計
+            total_amount = 0
+            months_coll = db.collection("youtubers")\
+                            .document(yid)\
+                            .collection("months")\
+                            .stream()
+            for mdoc in months_coll:
+                if mdoc.id.startswith(year):
+                    total_amount += mdoc.to_dict().get("totalAmount", 0)
         else:
-          amount = (youtuber_summary_doc.to_dict()).get('monthlyAmount', {}).get(month, 0)
-        
-        if amount == 0:
+            # 月間は該当年月ドキュメントを直接取得
+            yyyy_mm = f"{year}{month}"
+            mdoc = (
+                db.collection("youtubers")
+                  .document(yid)
+                  .collection("months")
+                  .document(yyyy_mm)
+                  .get()
+            )
+            total_amount = mdoc.to_dict().get("totalAmount", 0) if mdoc.exists else 0
+
+        if total_amount == 0:
             continue
-        
+
         ranking_list.append({
-            "amount": amount,
-            "youtuberName": youtuber['youtuberName'],
-            "youtuberId": youtuber['youtuberId'],
-            "youtuberIconUrl": youtuber['youtuberIconUrl']
+            "amount": total_amount,
+            "youtuberName": y.get("youtuberName"),
+            "youtuberId": yid,
+            "youtuberIconUrl": y.get("youtuberIconUrl"),
         })
-    
-    sorted_ranking = sorted(ranking_list, key=lambda x: x['amount'], reverse=True)
-    return sorted_ranking
+
+    # 降順ソート、上位100件
+    sorted_ranking = sorted(ranking_list, key=lambda x: x["amount"], reverse=True)
+    return sorted_ranking[:100]
 
 @app.route("/api/getSupportersRanking", methods=["POST"])
 def getSupportersRanking():
@@ -235,7 +254,7 @@ def get_all_supporters_ranking(_year, _month, showYear):
         youtuber = youtuber_doc.to_dict()
         # print("youtuber", youtuber)
         supporters = get_supporters_ranking(_year, _month, youtuber['youtuberId'], showYear)
-        for supporter in supporters['top_supporters']:
+        for supporter in supporters:
             supporter['youtuberId'] = youtuber['youtuberId']
             supporter['youtuberIconUrl'] = youtuber['youtuberIconUrl']
             supporter['youtuberName'] = youtuber['youtuberName']
@@ -246,51 +265,49 @@ def get_all_supporters_ranking(_year, _month, showYear):
 
 @cache_with_persistence()
 def get_supporters_ranking(_year, _month, youtuberId, showYear):
-    youtuber_ref = db.collection('youtubers').document(youtuberId)
-    # ① summary ドキュメントを取得
-    print("year_month", _year, _month)
-    print("youtuber_doc", youtuber_ref.collection('summary').document(_year))
-    summary_doc = youtuber_ref.collection('summary').document(_year).get()
-    summary = summary_doc.to_dict() or {}     # 存在しなければ {} に
-    print("summary", summary)
-    logging.info(f"summary: {summary}")
-    # ② 年間 or 月間の合計額を取り出す
+    """
+    _year  : '_YYYY'
+    _month : '_MM'
+    showYear: bool
+    """
+    yref = db.collection("youtubers").document(youtuberId)
+    sup_coll = yref.collection("supporters")
+
+    # 支援者サブドキュメントの monthlyAmount / yearlyAmount フィールド名
     if showYear:
-        total_amount = summary.get('totalAmount', 0)
         order_field = f"yearlyAmount.{_year}"
     else:
-        monthly_map = summary.get('monthlyAmount', {})
-        total_amount = monthly_map.get(_month, 0)
         order_field = f"monthlyAmount.{_year}{_month}"
 
-    # ③ 支援者ランキングを取得
-    youtuber_supporter_list = (
-        youtuber_ref
-          .collection('supporters')
+    # 支援者ランキングを取得
+    supporters_query = (
+        sup_coll
           .order_by(order_field, direction=firestore.Query.DESCENDING)
           .limit(100)
           .stream()
     )
 
     top_supporters = []
-    for supporter in youtuber_supporter_list:
-        data = supporter.to_dict()
+    for doc in supporters_query:
+        data = doc.to_dict()
         if showYear:
-            amount = data.get('yearlyAmount', {}).get(_year, 0)
+            amount = data.get("yearlyAmount", {}).get(_year, 0)
         else:
-            amount = data.get('monthlyAmount', {}).get(_year + _month, 0)
+            amount = data.get("monthlyAmount", {}).get(_year + _month, 0)
+
+        # 月間・年間合計が 0 の支援者はスキップ
+        if amount == 0:
+            continue
+
         top_supporters.append({
-            'supporterName': data['supporterName'],
-            'supporterId': supporter.id,
-            'amount': amount,
-            'supporterIconUrl': data['supporterIconUrl']
+            "supporterName": data["supporterName"],
+            "supporterId": doc.id,
+            "amount": amount,
+            "supporterIconUrl": data.get("supporterIconUrl"),
         })
 
-    return {
-        "total_amount": total_amount,
-        "top_supporters": top_supporters,
-        "youtuberName": (youtuber_ref.get().to_dict() or {}).get('youtuberName', '')
-    }
+    return top_supporters
+
 
 @app.route("/api/getYoutuberInfo", methods=["POST"])
 def getYoutuberInfo():
@@ -425,49 +442,6 @@ def create_account_link():
         return jsonify({'url': account_link.url})
     except Exception as e:
         return jsonify(error=str(e)), 403
-
-# @app.route('/api/webhook', methods=['POST'])
-# def stripe_webhook():
-#     payload = request.get_data(as_text=True)
-#     sig_header = request.headers.get('Stripe-Signature')
-#     endpoint_secret = os.environ.get('STRIPE_ENDPOINT_SECRET')
-
-#     try:
-#         event = stripe.Webhook.construct_event(
-#             payload, sig_header, endpoint_secret
-#         )
-#     except ValueError as e:
-#         return jsonify(success=False), 400
-#     except stripe.error.SignatureVerificationError as e:
-#         return jsonify(success=False), 400
-
-#     event_dict = stripe.util.convert_to_dict(event)
-
-#     if event_dict['type'] == 'payment_intent.succeeded':
-#         print("event", event_dict)
-#         session = event_dict['data']['object']
-#         youtuber_id = session['metadata']['youtuberId']
-#         supporter_id = session['metadata']['supporterId']
-#         created = event_dict['created']
-#         year = '_' + datetime.utcfromtimestamp(created).strftime("%Y")
-#         month = '_' + datetime.utcfromtimestamp(created).strftime("%m")
-#         new_amount = session['amount_received']
-#         print(datetime.utcfromtimestamp(created).strftime("_%Y_%m"))
-#         supporter_data = db.collection('supporters').document(supporter_id).get().to_dict()
-#         update_one_supporter(supporter_data, year, month, new_amount, youtuber_id)
-#         youtuber_ref = db.collection('youtubers').document(youtuber_id)
-#         youtuber_ref.set({
-#             "totalAmount": firestore.Increment(new_amount)
-#         }, merge=True)
-#         youtuber_summary_year_ref = youtuber_ref.collection("summary").document(year)
-#         youtuber_summary_year_ref.set({
-#             "totalAmount": firestore.Increment(new_amount),
-#             "monthlyAmount": {
-#                 month: firestore.Increment(new_amount)
-#             }
-#         }, merge=True)
-
-#     return jsonify(success=True), 200
 
 @app.route('/api/createCheckoutSession', methods=['POST'])
 def create_checkout_session():

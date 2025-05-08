@@ -1,0 +1,1 @@
+bash run_set_youtuber_superchats.sh

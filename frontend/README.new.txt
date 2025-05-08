@@ -1,8 +1,8 @@
-localでdevelop
+localでdevelop:
 
 npm run dev
 
-deploy
+deploy:
 
 1. npm run build
 

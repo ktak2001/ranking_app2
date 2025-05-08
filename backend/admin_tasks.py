@@ -46,7 +46,7 @@ def get_supporter_custom_url(supporter_id):
         logger.error(f"items not found in data, or no customUrl for supporter_id: {supporter_id}")
     return '@'
 
-def update_supporter(supporter, _year, _month, amount, youtuber_id, video_id, vid_info, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing):
+def update_supporter(supporter, _year, _month, amount, youtuber_id, video_id, vid_info):
     try:
         supporter_name, supporter_id, supporter_icon_url = (
             supporter[k] for k in ('supporterName', 'supporterId', 'supporterIconUrl')
@@ -61,7 +61,7 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, video_id, vi
         else:
             supporter_data = supporter_doc.to_dict()
             supporter_custom_url = supporter_data.get('supporterCustomUrl', "@")
-        
+        _yyyy_mm = _year + _month
         youtuber_supporter_ref.set({
             "supporterName": supporter_name,
             "supporterId": supporter_id,
@@ -69,15 +69,14 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, video_id, vi
             "supporterCustomUrl": supporter_custom_url,
             "totalAmount": new_amount,
             "monthlyAmount": {
-                _year + _month: new_amount
+                _yyyy_mm: new_amount
             },
             "yearlyAmount": {
                 _year: new_amount
             },
         }, merge=True)
-        yyyy_mm = (_year+_month).lstrip('_')  # '2025_04'
         # ★ Supporter → months/donations 追記
-        month_ref = db.collection("supporters").document(supporter_id).collection("months").document(yyyy_mm)
+        month_ref = db.collection("supporters").document(supporter_id).collection("months").document(_yyyy_mm)
         month_ref.set({"totalAmount": firestore.Increment(amount)}, merge=True)
         month_ref.collection("donations").document(video_id).set({
             "youtuberId": youtuber_id,
@@ -86,11 +85,6 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, video_id, vi
             "videoTitle": vid_info["title"],
             "thumbnailUrl": vid_info["thumbnailUrl"],
         }, merge=True)
-        processing_youtubers_video_ref.set({
-            "youtuberSupporterRef": firestore.ArrayUnion([supporter_id])
-        }, merge=True)
-        if is_processing and supporter_id in processing_youtubers_video_data.get("supporterRef", []):
-            return
         if not supporter_doc.exists:
             supporter_ref.set({
                 "supporterName": supporter_name,
@@ -102,11 +96,8 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, video_id, vi
         supporter_ref.set({
             "supportedYoutubers": {
                 _year: firestore.ArrayUnion([youtuber_id]),
-                _year + _month: firestore.ArrayUnion([youtuber_id]),
+                _yyyy_mm: firestore.ArrayUnion([youtuber_id]),
             },
-        }, merge=True)
-        processing_youtubers_video_ref.set({
-            "supporterRef": firestore.ArrayUnion([supporter_id])
         }, merge=True)
     except Exception as e:
         logger.error(f"Error in update_supporter: {str(e)}")
@@ -120,7 +111,7 @@ def update_for_each_video(youtuber_info, video):
             return
         video_id = vid_info["videoId"]
         published_at = vid_info["publishedAt"]
-        yyyy_mm = published_at[:7].replace("-", "_")  # e.g. 2025_04
+        _yyyy_mm = "_" + published_at[:7].replace("-", "_")  # e.g. 2025_04
 
         # superchat 解析
         yt_url = f"https://www.youtube.com/watch?v={video_id}"
@@ -138,11 +129,11 @@ def update_for_each_video(youtuber_info, video):
 
         # ★ 動画 Doc 書き込み (VTuber 側)
         db.collection("youtubers").document(youtuber_info["youtuber_id"])\
-          .collection("months").document(yyyy_mm)\
+          .collection("months").document(_yyyy_mm)\
           .set({"totalAmount": firestore.Increment(video_total_earning)}, merge=True)
 
         db.collection("youtubers").document(youtuber_info["youtuber_id"])\
-          .collection("months").document(yyyy_mm)\
+          .collection("months").document(_yyyy_mm)\
           .collection("videos").document(video_id)\
           .set({
               "videoId": video_id,
@@ -151,18 +142,9 @@ def update_for_each_video(youtuber_info, video):
               "publishedAt": published_at,
               "amount": video_total_earning,
           }, merge=True)
-
-        processing_youtubers_ref = db.collection("processing_youtubers").document(youtuber_info["youtuber_id"])
-        processing_youtubers_video_ref = processing_youtubers_ref.collection("videos").document(video_id)
-        processing_youtubers_video_doc = processing_youtubers_video_ref.get()
-        is_processing = processing_youtubers_video_doc.exists
-        processing_youtubers_video_data = (
-            processing_youtubers_video_doc.to_dict()
-            if is_processing else {}
-        )
         # 既存まとめの後、各サポーター処理へ渡す
         for _, supporter in all_supporters_info.items():
-            update_supporter(supporter, '_' + published_at[:4], '_' + published_at[5:7], supporter['amount'], youtuber_info['youtuber_id'], video_id, vid_info, processing_youtubers_video_ref, processing_youtubers_video_data, is_processing)
+            update_supporter(supporter, '_' + published_at[:4], '_' + published_at[5:7], supporter['amount'], youtuber_info['youtuber_id'], video_id, vid_info)
     except RetryError as e:
         logger.error(f"Failed to process video {video['id']} after 5 retries: {str(e)}")
         sys.exit(1)  # スクリプトを終了
@@ -171,54 +153,6 @@ def update_for_each_video(youtuber_info, video):
         sys.exit(1)
     finally:
         time.sleep(5)
-
-
-# def update_doc(youtuber_info, video_info, all_supporters_info):
-#     youtuber_id, youtuber_name, youtuber_icon_url, youtuber_custom_url = (
-#         youtuber_info[k] for k in ('youtuber_id', 'youtuber_name', 'youtuber_icon_url', 'youtuber_custom_url')
-#     )
-#     video_id = video_info['video_id']
-#     _year = video_info['_year']
-#     _month = video_info['_month']
-#     video_total_earning = video_info['video_total_earning']
-#     processing_youtubers_ref = db.collection("processing_youtubers").document(youtuber_id)
-#     processing_youtubers_video_ref = processing_youtubers_ref.collection("videos").document(video_id)
-#     processing_youtubers_video_doc = processing_youtubers_video_ref.get()
-#     is_processing = processing_youtubers_video_doc.exists
-#     processing_youtubers_video_data = processing_youtubers_video_doc.to_dict() if is_processing else {}
-#     youtuber_ref = db.collection("youtubers").document(youtuber_id)
-#     logger.info(f"is_processing: {is_processing}, youtuber_id: {youtuber_id}, video_id: {video_id}")
-#     if not is_processing:
-#         youtuber_ref.set({
-#             "totalAmount": firestore.Increment(video_total_earning)
-#         }, merge=True)
-#         processing_youtubers_video_ref.set({
-#             "summary": False,
-#             "youtuberSupporterRef": [],
-#             "supporterRef": []
-#         })
-#         logger.info(f"set is_processing, youtuber_id: {youtuber_id}, video_id: {video_id}")
-#     if not is_processing or not processing_youtubers_video_data.get("summary", False):
-#         youtuber_summary_year_ref = youtuber_ref.collection("summary").document(_year)
-#         youtuber_summary_year_ref.set({
-#             "totalAmount": firestore.Increment(video_total_earning),
-#             "monthlyAmount": {
-#                 _month: firestore.Increment(video_total_earning)
-#             }
-#         }, merge=True)
-#         processing_youtubers_video_ref.set({
-#             "summary": True
-#         }, merge=True)
-#     for _, supporter in all_supporters_info.items():
-#         update_supporter(supporter, _year, _month, supporter['amount'], youtuber_id, video_id, video_info['publishedAt'] processing_youtubers_video_ref, processing_youtubers_video_data, is_processing)
-#     youtuber_ref.set({
-#         "videoIds": firestore.ArrayUnion([video_id])
-#     }, merge=True)
-#     processing_youtubers_ref.set({
-#         "processed": firestore.ArrayUnion([video_id])
-#     }, merge=True)
-#     processing_youtubers_video_ref.delete()
-#     logger.info(f"finished updating doc for video {video_id}")
 
 def set_youtuber_superChats(youtubers):
     try:
@@ -279,42 +213,3 @@ def set_youtuber_superChats(youtubers):
     except Exception as e:
         logger.error(f"Critical error in set_youtuber_superChats: {str(e)}")
         sys.exit(1)  # スクリプトを終了
-
-# @tasks_blueprint.route('/tasks/update_youtubers', methods=['GET'])
-# def update_youtubers():
-#     youtubers_docs = db.collection('youtubers').stream()
-#     for youtuber in youtubers_docs:
-#         today = datetime.today() - timedelta(days=5)
-#         youtuber_info, video_ids = youtube_api.get_videos_until_date(youtuber.id, today.year, today.month, today.day)
-#         all_vid_infos = youtube_api.process_videos(video_ids)
-#         for vid in all_vid_infos:
-#             if vid.get('liveStreamingDetails') == None or vid['snippet']['liveBroadcastContent'] == 'live' or vid['liveStreamingDetails'].get('actualEndTime') == None:
-#                 continue
-#             update_for_each_video(youtuber_info, vid)
-#     return {"success": True}
-
-# @tasks_blueprint.route('/admin/manual_update', methods=['POST'])
-# def manual_update():
-#     if not authenticate_admin(request):
-#         abort(401)
-#     pass
-
-# def authenticate_admin(request):
-#     auth_header = request.headers.get('Authorization')
-#     if not auth_header:
-#         return False
-
-#     import base64
-#     try:
-#         auth_decoded = base64.b64decode(auth_header.split()[1]).decode('utf-8')
-#         username, password = auth_decoded.split(':')
-#     except (IndexError, ValueError):
-#         return False
-
-#     if username != ADMIN_USERNAME:
-#         return False
-
-#     password_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
-#     expected_hash = hashlib.sha256(ADMIN_PASSWORD.encode('utf-8')).hexdigest()
-
-#     return hmac.compare_digest(password_hash, expected_hash)
