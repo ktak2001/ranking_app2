@@ -185,6 +185,7 @@ def get_youtubers_ranking(year, month, showYear):
     month: '_MM'
     showYear: bool
     """
+    total_amount = 0
     ranking_list = []
     for youtuber_doc in db.collection("youtubers").stream():
         y = youtuber_doc.to_dict()
@@ -193,14 +194,14 @@ def get_youtubers_ranking(year, month, showYear):
         # ―― 年間集計 or 月間集計 ――
         if showYear:
             # 年間は months サブコレの全 month ドキュメントを合計
-            total_amount = 0
+            youtuber_total_amount = 0
             months_coll = db.collection("youtubers")\
                             .document(yid)\
                             .collection("months")\
                             .stream()
             for mdoc in months_coll:
                 if mdoc.id.startswith(year):
-                    total_amount += mdoc.to_dict().get("totalAmount", 0)
+                    youtuber_total_amount += mdoc.to_dict().get("totalAmount", 0)
         else:
             # 月間は該当年月ドキュメントを直接取得
             yyyy_mm = f"{year}{month}"
@@ -211,13 +212,13 @@ def get_youtubers_ranking(year, month, showYear):
                   .document(yyyy_mm)
                   .get()
             )
-            total_amount = mdoc.to_dict().get("totalAmount", 0) if mdoc.exists else 0
+            youtuber_total_amount = mdoc.to_dict().get("totalAmount", 0) if mdoc.exists else 0
 
-        if total_amount == 0:
+        if youtuber_total_amount == 0:
             continue
-
+        total_amount += youtuber_total_amount
         ranking_list.append({
-            "amount": total_amount,
+            "amount": youtuber_total_amount,
             "youtuberName": y.get("youtuberName"),
             "youtuberId": yid,
             "youtuberIconUrl": y.get("youtuberIconUrl"),
@@ -254,7 +255,7 @@ def get_all_supporters_ranking(_year, _month, showYear):
         youtuber = youtuber_doc.to_dict()
         # print("youtuber", youtuber)
         supporters = get_supporters_ranking(_year, _month, youtuber['youtuberId'], showYear)
-        for supporter in supporters:
+        for supporter in supporters['top_supporters']:
             supporter['youtuberId'] = youtuber['youtuberId']
             supporter['youtuberIconUrl'] = youtuber['youtuberIconUrl']
             supporter['youtuberName'] = youtuber['youtuberName']
@@ -286,7 +287,7 @@ def get_supporters_ranking(_year, _month, youtuberId, showYear):
           .limit(100)
           .stream()
     )
-
+    total_amount = 0
     top_supporters = []
     for doc in supporters_query:
         data = doc.to_dict()
@@ -298,7 +299,7 @@ def get_supporters_ranking(_year, _month, youtuberId, showYear):
         # 月間・年間合計が 0 の支援者はスキップ
         if amount == 0:
             continue
-
+        total_amount += amount
         top_supporters.append({
             "supporterName": data["supporterName"],
             "supporterId": doc.id,
@@ -306,7 +307,7 @@ def get_supporters_ranking(_year, _month, youtuberId, showYear):
             "supporterIconUrl": data.get("supporterIconUrl"),
         })
 
-    return top_supporters
+    return {"top_supporters": top_supporters, "total_amount": total_amount}
 
 
 @app.route("/api/getYoutuberInfo", methods=["POST"])

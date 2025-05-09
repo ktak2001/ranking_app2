@@ -36,7 +36,7 @@ export default async function YoutuberDetailsPage({ params }) {
   const {year, month} = yearMonth()
   const youtuberInfo = await getYoutuberInfo(params.youtuberId);
   const initialRankingData = await getSupportersRanking(year, month, params.youtuberId, false);
-
+  console.log({initialRankingData})
   return (
     <>
       <script
