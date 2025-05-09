@@ -159,8 +159,10 @@ def update_for_each_video(youtuber_info, vid_info):
 
 def set_youtuber_superChats(youtubers, days_back: int = -1):
     today_jst = datetime.now(timezone(timedelta(hours=9)))
+
+    # --- ① until を datetime で統一 ---------------------------
     if days_back == -1:
-        until = {"year": 2023, "month": 12, "day": 31}
+        until = datetime(2023, 12, 31, tzinfo=timezone(timedelta(hours=9)))
     else:
         until = today_jst - timedelta(days=days_back)
     try:
