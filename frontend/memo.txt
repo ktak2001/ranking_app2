@@ -1,0 +1,43 @@
+cloud run jobで実行できるような２つのスケジューラを用意したい。
+１つ目は、set_youtubers.pyを毎日実行するようなものだ。
+ただし、そこで呼び出す関数であるset_youtuber_superChatsにおけるget_videos_until_dateについて、現在はdefaultで2023,12,31になっているが、それをその日から5日前まで処理するように変更してほしい。
+
+2つ目は、各vtuberの情報を週に一回updateするものだ。そのvtuberの画像や表示名は定期的に変更される可能性があるためである。
+
+3つ目は、全supportersの情報を2週間に一回updateするものだ。同様に画像や表示名が変更されるためである。
+
+現在のset_youtubers.pyと、set_youtuber_superChatsが書かれたadmin_tasks.pyを添付するので確かめてほしい
+
+-------
+
+更新用スクリプトまではちゃんと作れました。
+
+あと念の為共有しておくこととして、現在スケジューラとは別にset_youtubers.pyをcompute engineで実行するスクリプトがこちらにあるのですが、色々と参考になるかもしれないので念の為添付しておきます。
+
+ちなみにcompute engineで実行するスクリプトについてはdockerfileを使っていないのですが、cloud runだと必要になってくるのでしょうか。
+
+あと、それぞれのjobについてですが、基本的には5時間程度で終わるものだと考えております。
+
+------
+
+gcloud builds submit --tag gcr.io/$PROJECT_ID/ranking-app-jobs
+
+上のコマンドはdockerfileがあるディレクトリで直接叩けばいいですか?
+また、実際のbackendディレクトリやscriptsディレクトリには、cloud run jobsはどのようにしてアクセスするのでしょうか（compute engineではVM上でgit cloneすることでアクセスしていましたが）
+
+また、vscodeでdockerfileを開くと、tag recommendationsが出るのですが、3.13-slimにすればいいということでしょうか
+
+また現在画像のようにUI上でschedulerを設定しようと試みているのですが、実行内容におけるターゲットタイプなどはどのように選択すればいいのでしょうか。それともUI上で設定するよりCLIで設定した方が楽でしょうか
+
+-----
+
+update_vtubers_profile.pyなどを作ったはいいものの、どこを経由してそもそもこのファイルが実行されるかが分からない。現在はscriptsディレクトリにただそのファイルを配置しているだけである。
+
+gcloud scheduler jobs create http update_videos_everyday \
+  --location asia-northeast1 \
+  --schedule "0 3 * * *" \
+  --uri "https://run.googleapis.com/v2/projects/$PROJECT_ID/locations/asia-northeast1/jobs/set-youtubers-job:run" \
+  --http-method POST \
+  --oidc-service-account-email scheduler-sa@$PROJECT_ID.iam.gserviceaccount.com
+
+例えば上のコマンドだが、これはset-youtubers-jobというジョブが既に作成されていることが前提の上でのコマンドな気がするが、そういったジョブをそもそも作成すればいいかが分からない。

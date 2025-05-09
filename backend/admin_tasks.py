@@ -6,7 +6,7 @@ import requests
 import hashlib
 import hmac
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 import sys
 from tenacity import retry, stop_after_attempt, wait_exponential, RetryError, retry_if_exception_type
@@ -153,6 +153,68 @@ def update_for_each_video(youtuber_info, video):
         sys.exit(1)
     finally:
         time.sleep(5)
+
+def set_youtuber_superChats_scheduler(youtubers, days_back: int = 5):
+    today_jst = datetime.now(timezone(timedelta(hours=9)))
+    until = today_jst - timedelta(days=days_back)
+    try:
+        for youtuber in youtubers:
+            youtuber_id = youtuber.get('youtuberId')
+            youtuber_name = youtuber.get('youtuberName')
+            if not youtuber_id or not youtuber_name:
+                logger.warning(f"Skipping youtuber due to missing data: {youtuber}")
+                continue
+            logger.info(f"Processing youtuber: {youtuber_name} ({youtuber_id})")
+
+            youtuber_info, video_ids = youtube_api.get_videos_until_date(youtuber_id, until.year, until.month, until.day)
+            logger.info(f"Retrieved {len(video_ids)} videos for {youtuber_name}")
+            youtuber_id, youtuber_name, youtuber_icon_url, youtuber_custom_url = (
+                youtuber_info[k] for k in ('youtuber_id', 'youtuber_name', 'youtuber_icon_url', 'youtuber_custom_url')
+            )
+            youtuber_ref = db.collection("youtubers").document(youtuber_id)
+            youtuber_doc = youtuber_ref.get()
+            if not youtuber_doc.exists:
+                youtuber_ref.set({
+                    "youtuberName": youtuber_name,
+                    "totalAmount": 0,
+                    "youtuberId": youtuber_id,
+                    "videoIds": [],
+                    "youtuberIconUrl": youtuber_icon_url,
+                    "youtuberCustomUrl": youtuber_custom_url
+                }, merge=True)
+                youtuber_data = None
+            else:
+                youtuber_ref.set({
+                    "youtuberName": youtuber_name,
+                    "youtuberId": youtuber_id,
+                    "youtuberIconUrl": youtuber_icon_url,
+                    "youtuberCustomUrl": youtuber_custom_url
+                }, merge=True)
+                # 後で上の行消す
+                youtuber_data = youtuber_doc.to_dict()
+            processed_video_ids = youtuber_data.get('videoIds', []) if youtuber_data is not None else []
+            unnecessary_video_ids = [item['id'] for item in youtuber_data.get('unnecessaryVideoIds', [])] if youtuber_data is not None else []
+
+
+            for vid_id in video_ids:
+                if youtuber_data is None or vid_id not in (processed_video_ids + unnecessary_video_ids):
+                    logger.info(f"trying to process {youtuber_name}'s video: {vid_id}")
+                    vid_info = youtube_api.get_video_details(vid_id)
+                    vid_info = vid_info["raw"]
+                    if vid_info.get('liveStreamingDetails') is None or vid_info['snippet']['liveBroadcastContent'] == 'live' or vid_info['liveStreamingDetails'].get('actualEndTime') is None:
+                        logger.info(f"{youtuber_name}'s video: {vid_id} is not live streaming, or still onlive")
+                        continue
+                    logger.info(f"Updating {youtuber_name}'s video: {vid_id}")
+                    update_for_each_video(youtuber_info, vid_info)
+                else:
+                    logger.info(f"{youtuber_name}'s video: {vid_id} was already processed")
+        return {"success": True}
+    except KeyError as e:
+        logger.error(f"KeyError in set_youtuber_superChats: {str(e)}")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"Critical error in set_youtuber_superChats: {str(e)}")
+        sys.exit(1)  # スクリプトを終了
 
 def set_youtuber_superChats(youtubers):
     try:

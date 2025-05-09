@@ -23,7 +23,7 @@ class YouTubeAPI:
       )
       data = requests.get(url, timeout=30).json()
       if "items" not in data or not data["items"]:
-          logger.error(f"cannnot find video: {video_id}")
+          logger.error(f"cannot find video: {video_id}")
           return None
       item = data["items"][0]
       snippet = item["snippet"]
