@@ -41,3 +41,19 @@ gcloud scheduler jobs create http update_videos_everyday \
   --oidc-service-account-email scheduler-sa@$PROJECT_ID.iam.gserviceaccount.com
 
 例えば上のコマンドだが、これはset-youtubers-jobというジョブが既に作成されていることが前提の上でのコマンドな気がするが、そういったジョブをそもそも作成すればいいかが分からない。
+
+-----
+
+https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails,statistics,status,topicDetails,localizations,snippet,contentDetails&id=fKhGEY0I4Tc&key=AIzaSyCKum_aL-2IjZ7vqTdXCR36hTrJGFMUHik
+
+-----
+
+現在、admin_tasks.pyのset_youtuber_superchatsという関数を実行することでfirestoreに初期値のデータを入れているのですが、たびたびエラーが起きて中断します。現状のままだと、中断したところからの再開ができないです。
+具体的にエラーが起きる箇所は、
+1. get_videos_until_date
+2. get_video_details
+3. update_for_each_video内のget_superchats_with_retry
+4. update_supporter内のget_supporter_custom_url
+です。
+a. まず、各videoについて完全に終了した場合、それをdb.collection("youtubers").document(youtuber_id)のvideoIds配列に入れることで、1・2・3のエラーで中断した場合には対応できると考えます(具体的にはset_youtuber_superChats内のupdate_for_each_video関数呼び出し後に)。
+b. 4のエラーの場合、これをエラーと見なさなければいいと考えます。具体的には、仮にget_supporter_custom_url内でエラーが起きた場合、それをupdate_supporter内でcatchし、supporter_custom_urlの文字列を"__error_getting_custom_url__"にして処理を続行すればいいはずです。このようにすれば、恐らく大丈夫だと思うので、aとbの処理をプログラムに埋め込んで下さい

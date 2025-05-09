@@ -57,7 +57,11 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, video_id, vi
         supporter_doc = supporter_ref.get()
         # logger.info(f"updating supporter {supporter_id} for youtuber {youtuber_id}")
         if not supporter_doc.exists:
-            supporter_custom_url = get_supporter_custom_url(supporter_id)
+            try:
+                supporter_custom_url = get_supporter_custom_url(supporter_id)
+            except Exception as e:
+                logger.error(f"get_supporter_custom_url failed: {e}")
+                supporter_custom_url = "__error_getting_custom_url__"
         else:
             supporter_data = supporter_doc.to_dict()
             supporter_custom_url = supporter_data.get('supporterCustomUrl', "@")
@@ -103,12 +107,8 @@ def update_supporter(supporter, _year, _month, amount, youtuber_id, video_id, vi
         logger.error(f"Error in update_supporter: {str(e)}")
         raise  # この例外を再度発生させ、呼び出し元に伝播させる
 
-def update_for_each_video(youtuber_info, video):
+def update_for_each_video(youtuber_info, vid_info):
     try:
-        vid_info = youtube_api.get_video_details(video["id"])
-        if not vid_info:
-            logger.warning(f"video details not found for {video['id']}")
-            return
         video_id = vid_info["videoId"]
         published_at = vid_info["publishedAt"]
         _yyyy_mm = "_" + published_at[:7].replace("-", "_")  # e.g. 2025_04
@@ -121,7 +121,7 @@ def update_for_each_video(youtuber_info, video):
             error_name = video_total_earning
             db.collection("youtubers").document(youtuber_info['youtuber_id']).set({
                 'unnecessaryVideoIds': firestore.ArrayUnion([{
-                    'id': video['id'],
+                    'id': video_id,
                     'error': error_name
                 }])
             }, merge=True)
@@ -145,8 +145,11 @@ def update_for_each_video(youtuber_info, video):
         # 既存まとめの後、各サポーター処理へ渡す
         for _, supporter in all_supporters_info.items():
             update_supporter(supporter, '_' + published_at[:4], '_' + published_at[5:7], supporter['amount'], youtuber_info['youtuber_id'], video_id, vid_info)
+        db.collection("youtubers").document(
+            youtuber_info["youtuber_id"]
+        ).set({"videoIds": firestore.ArrayUnion([video_id])}, merge=True)
     except RetryError as e:
-        logger.error(f"Failed to process video {video['id']} after 5 retries: {str(e)}")
+        logger.error(f"Failed to process video {video_id} after 5 retries: {str(e)}")
         sys.exit(1)  # スクリプトを終了
     except Exception as e:
         logger.error(f"Unexpected error in update_for_each_video: {str(e)}")
@@ -154,9 +157,12 @@ def update_for_each_video(youtuber_info, video):
     finally:
         time.sleep(5)
 
-def set_youtuber_superChats_scheduler(youtubers, days_back: int = 5):
+def set_youtuber_superChats(youtubers, days_back: int = -1):
     today_jst = datetime.now(timezone(timedelta(hours=9)))
-    until = today_jst - timedelta(days=days_back)
+    if days_back == -1:
+        until = {"year": 2023, "month": 12, "day": 31}
+    else:
+        until = today_jst - timedelta(days=days_back)
     try:
         for youtuber in youtubers:
             youtuber_id = youtuber.get('youtuberId')
@@ -167,66 +173,6 @@ def set_youtuber_superChats_scheduler(youtubers, days_back: int = 5):
             logger.info(f"Processing youtuber: {youtuber_name} ({youtuber_id})")
 
             youtuber_info, video_ids = youtube_api.get_videos_until_date(youtuber_id, until.year, until.month, until.day)
-            logger.info(f"Retrieved {len(video_ids)} videos for {youtuber_name}")
-            youtuber_id, youtuber_name, youtuber_icon_url, youtuber_custom_url = (
-                youtuber_info[k] for k in ('youtuber_id', 'youtuber_name', 'youtuber_icon_url', 'youtuber_custom_url')
-            )
-            youtuber_ref = db.collection("youtubers").document(youtuber_id)
-            youtuber_doc = youtuber_ref.get()
-            if not youtuber_doc.exists:
-                youtuber_ref.set({
-                    "youtuberName": youtuber_name,
-                    "totalAmount": 0,
-                    "youtuberId": youtuber_id,
-                    "videoIds": [],
-                    "youtuberIconUrl": youtuber_icon_url,
-                    "youtuberCustomUrl": youtuber_custom_url
-                }, merge=True)
-                youtuber_data = None
-            else:
-                youtuber_ref.set({
-                    "youtuberName": youtuber_name,
-                    "youtuberId": youtuber_id,
-                    "youtuberIconUrl": youtuber_icon_url,
-                    "youtuberCustomUrl": youtuber_custom_url
-                }, merge=True)
-                # 後で上の行消す
-                youtuber_data = youtuber_doc.to_dict()
-            processed_video_ids = youtuber_data.get('videoIds', []) if youtuber_data is not None else []
-            unnecessary_video_ids = [item['id'] for item in youtuber_data.get('unnecessaryVideoIds', [])] if youtuber_data is not None else []
-
-
-            for vid_id in video_ids:
-                if youtuber_data is None or vid_id not in (processed_video_ids + unnecessary_video_ids):
-                    logger.info(f"trying to process {youtuber_name}'s video: {vid_id}")
-                    vid_info = youtube_api.get_video_details(vid_id)
-                    vid_info = vid_info["raw"]
-                    if vid_info.get('liveStreamingDetails') is None or vid_info['snippet']['liveBroadcastContent'] == 'live' or vid_info['liveStreamingDetails'].get('actualEndTime') is None:
-                        logger.info(f"{youtuber_name}'s video: {vid_id} is not live streaming, or still onlive")
-                        continue
-                    logger.info(f"Updating {youtuber_name}'s video: {vid_id}")
-                    update_for_each_video(youtuber_info, vid_info)
-                else:
-                    logger.info(f"{youtuber_name}'s video: {vid_id} was already processed")
-        return {"success": True}
-    except KeyError as e:
-        logger.error(f"KeyError in set_youtuber_superChats: {str(e)}")
-        sys.exit(1)
-    except Exception as e:
-        logger.error(f"Critical error in set_youtuber_superChats: {str(e)}")
-        sys.exit(1)  # スクリプトを終了
-
-def set_youtuber_superChats(youtubers):
-    try:
-        for youtuber in youtubers:
-            youtuber_id = youtuber.get('youtuberId')
-            youtuber_name = youtuber.get('youtuberName')
-            if not youtuber_id or not youtuber_name:
-                logger.warning(f"Skipping youtuber due to missing data: {youtuber}")
-                continue
-            logger.info(f"Processing youtuber: {youtuber_name} ({youtuber_id})")
-            
-            youtuber_info, video_ids = youtube_api.get_videos_until_date(youtuber_id, 2023, 12, 31)
             logger.info(f"Retrieved {len(video_ids)} videos for {youtuber_name}")
             youtuber_id, youtuber_name, youtuber_icon_url, youtuber_custom_url = (
                 youtuber_info[k] for k in ('youtuber_id', 'youtuber_name', 'youtuber_icon_url', 'youtuber_custom_url')
