@@ -208,6 +208,13 @@ def set_youtuber_superChats(youtubers, days_back: int = -1):
                 if youtuber_data is None or vid_id not in (processed_video_ids + unnecessary_video_ids):
                     logger.info(f"trying to process {youtuber_name}'s video: {vid_id}")
                     vid_info = youtube_api.get_video_details(vid_id)
+                    if vid_info is None:
+                      # ---------- 取得失敗を Firestore に記録 ----------
+                      youtuber_ref.set({
+                          "failedVideoIds": firestore.ArrayUnion([vid_id])
+                      }, merge=True)
+                      logger.warning(f"Failed to retrieve {vid_id}; added to failedVideoIds")
+                      continue   # 次の動画へ
                     vid_info_raw = vid_info["raw"]
                     if vid_info_raw.get('liveStreamingDetails') is None or vid_info_raw['snippet']['liveBroadcastContent'] == 'live' or vid_info_raw['liveStreamingDetails'].get('actualEndTime') is None:
                         logger.info(f"{youtuber_name}'s video: {vid_id} is not live streaming, or still onlive")

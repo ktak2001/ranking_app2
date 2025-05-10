@@ -40,6 +40,7 @@ export default function YoutubeRegisterSuccess() {
               }
             }).then(_ => {
               updateDoc(ref, {supporterId})
+              setSuccess(true)
               setWaiting(false)})
           }
         })
@@ -71,8 +72,14 @@ export default function YoutubeRegisterSuccess() {
     }
   }, [user, getAccount])
 
+  useEffect(() => {
+    if (!waiting) {
+      router.refresh()
+    }
+  }, [waiting])
+
   return (
-    <div>
+    <div className="mt-4 pt-5">
       {waiting && <div>loading...</div>}
       {!waiting && success &&
       <div>

@@ -57,3 +57,48 @@ https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails,statistic
 です。
 a. まず、各videoについて完全に終了した場合、それをdb.collection("youtubers").document(youtuber_id)のvideoIds配列に入れることで、1・2・3のエラーで中断した場合には対応できると考えます(具体的にはset_youtuber_superChats内のupdate_for_each_video関数呼び出し後に)。
 b. 4のエラーの場合、これをエラーと見なさなければいいと考えます。具体的には、仮にget_supporter_custom_url内でエラーが起きた場合、それをupdate_supporter内でcatchし、supporter_custom_urlの文字列を"__error_getting_custom_url__"にして処理を続行すればいいはずです。このようにすれば、恐らく大丈夫だと思うので、aとbの処理をプログラムに埋め込んで下さい
+
+-----
+1.
+bash deploy.sh
+を実行する場合と、
+gcloud builds submit --config cloudbuild.yaml
+を実行する場合でどう違いますか。
+
+2.
+現在、firebaseにhostingしている状態です。一方、opensuperchat.comというドメインをcloudflareで取得しそこからそのhostingしているサイトを開きたいと考えております。現在画像のような状況です。ここからどのようにして目的を達成すればいいでしょう
+
+-----
+
+ドメインのネームサーバーとはなんでしょうか。そんなもの自分はもっていません。ドメイン関連はfirebase hostingとcloudflareのみに完全委託したいのですが、、
+
+あと指示通りカスタムドメインを追加しようとしているのですが、この画像のような画面になりました。その後どうすればいいでしょう
+
+-----
+
+そもそもまだこのドメインを購入したことがないんですよね。
+あとfirebaseでカスタムドメインを追加しようとした際、リダイレクト先のドメインを入力する、という項目も存在したのですが、こちらは何を入力するべきだったのでしょうが。
+
+-----
+
+現在、HeaderにYoutubeLoginというボタンを追加している。
+これは、googleのメールアドレスで無料登録後、さらに自身のYoutubeチャンネルを紐づけるものである。しかし、このYouTubeログインボタンを押した際、色々と変な挙動を引き起こすことがある。
+
+1. まず、YouTubeLoginを押したら順調に進むが、「このアプリはGoogleで確認されていません」というページが出てしまう。しかも私の個人的なメアドがデベロッパーとしてさらされている(安全ではないページに移動、を押せば一応次に遷移できる)
+2. 次に、「project208...がGoogleアカウントへの追加アクセスを求めています」というページに遷移する。このページもできれば無くしてほしいし、無理であってもせめて「project-208...」ではなく「opensuperchat.com」に変えてほしい。
+3. redirectされたとき、リロードが行われないため、user.supporterId == trueなのにも関わらず、右上のボタンが未だにYouTubeLoginになっている（本来マイページになっていてほしい）
+
+youtubeLoginコンポーネントが使っているauth.jsも添付したのでそれらを踏まえて私の現状のYoutubeLoginの流れを解析してください。
+その上で、現状の方法ではなく「OAuth 2.0 PKCE + Authorization Code Flow」が推奨される理由が知りたい。
+また、同意途中に出てくる「project208...がGoogleアカウントへの追加アクセスを求めています」という画面については、どうしても無くせないのでしょうか。無理なら大丈夫ですが。
+
+-----
+
+get_video_details関数内の、
+if "items" not in data or not data["items"]:
+について、これは
+if "items" not in data:
+では駄目なんでしょうか。
+
+また、set_youtuber_superChatsにおけるget_video_details関数の呼び出しについて、Noneが返ってきた場合、
+db.collection("youtubers").document(youtuber_id)に、retrieveできなかったvideoIdの配列を作り、そこにそのvideoIdをpushした後continueしてほしい（今のプログラムだと、Noneが返ってきたらエラーでプログラムが終わってしまう。）

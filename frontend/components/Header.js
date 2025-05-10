@@ -10,6 +10,7 @@ import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import styles from "./Header.module.css";
 import './Header.buttons.css';
 import { FaUserPlus } from 'react-icons/fa'
+import YoutubeLogin from "./YoutubeLogin"
 
 export default function Header() {
   const user      = useAuth();
@@ -117,6 +118,12 @@ export default function Header() {
               無料ユーザー登録・ログイン
             </button>
           )}
+
+          {user && user.supporterId == "" &&
+            <div className="nav-item me-2">
+              <YoutubeLogin />
+            </div>
+          }
 
           {user && user.supporterId && (
             <Link href={`/supporters/${user.supporterId}`} className="btn-pill-blue">

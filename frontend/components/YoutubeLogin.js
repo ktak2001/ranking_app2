@@ -47,8 +47,6 @@ export default function YoutubeLogin() {
     form.submit();
   }
   return (
-    <button onClick={oauth2SignIn} className="btn btn-outline-primary">
-      自身のYoutubeチャンネルを登録
-    </button>
+    <button onClick={oauth2SignIn} className="btn btn-outline-primary">自身のYoutubeチャンネルを登録</button>
   )
 }

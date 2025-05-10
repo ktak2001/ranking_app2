@@ -54,20 +54,3 @@ gcloud run deploy backend \
 
 echo "Deployment completed successfully!"
 ```
-
-## Usage
-
-To deploy the backend service, run:
-
-```bash
-chmod +x deploy.sh
-./deploy.sh
-```
-
-This script will build the Docker image, push it to Google Container Registry, and deploy it to Cloud Run.
-
-## Notes
-
-- Ensure all necessary secrets (FIREBASE_CREDENTIALS, YOUTUBE_API_KEY, STRIPE_API_KEY) are set up in Google Secret Manager.
-- The `WEB_URL` environment variable is set to the Firebase hosting URL. Update this if your frontend URL changes.
-- The deployment region is set to `asia-northeast1`. Adjust this if you need to deploy to a different region.
