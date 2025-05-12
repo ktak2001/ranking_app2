@@ -31,6 +31,7 @@ export const logout = () => {
 // }
 
 const AuthContext = createContext(undefined)
+const AuthUpdateContext = createContext(()=>{});
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState();
@@ -66,7 +67,14 @@ export const AuthProvider = ({ children }) => {
     return unsubscribe;
   }, [])
 
-  return <AuthContext.Provider value={user}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={user}>
+      <AuthUpdateContext.Provider value={setUser}>
+        {children}
+      </AuthUpdateContext.Provider>
+    </AuthContext.Provider>
+  );
 };
 
-export const useAuth = () => useContext(AuthContext)
+export const useAuth = () => useContext(AuthContext);
+export const useSetAuth = () => useContext(AuthUpdateContext);

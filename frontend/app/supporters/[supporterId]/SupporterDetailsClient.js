@@ -49,7 +49,7 @@ export default function SupporterDetailsClient({ supporterInfo, params }) {
 
   /* ---------- UI ---------- */
   return (
-    <div className='mt-5 pt-5'>
+    <div className='mt-5 pt-2'>
       {/* プロフィールヘッダー */}
       <header
         style={{

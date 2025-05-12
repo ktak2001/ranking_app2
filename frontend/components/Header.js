@@ -11,6 +11,7 @@ import styles from "./Header.module.css";
 import './Header.buttons.css';
 import { FaUserPlus } from 'react-icons/fa'
 import YoutubeLogin from "./YoutubeLogin"
+import YoutubeLoginButton from "./YoutubeLoginButton.js"
 
 export default function Header() {
   const user      = useAuth();
@@ -121,12 +122,12 @@ export default function Header() {
 
           {user && user.supporterId == "" &&
             <div className="nav-item me-2">
-              <YoutubeLogin />
+              <YoutubeLoginButton />
             </div>
           }
 
           {user && user.supporterId && (
-            <Link href={`/supporters/${user.supporterId}`} className="btn-pill-blue">
+            <Link href={`/supporters/${user.supporterId}`} className="btn-pill-blue text-decoration-none">
               マイページ
             </Link>
           )}

@@ -1,9 +1,11 @@
 import "bootstrap/dist/css/bootstrap.min.css";
+import "../styles/globals.css"
 import { Inter } from "next/font/google";
 import AuthProviderClient from "../components/AuthProviderClient";
 import Header from "../components/Header";
 import BootstrapClient from "@/components/BootstrapClient.js";
 import Script from "next/script";
+import {YouTubeAuthProvider} from "../components/YoutubeAuthProvider.js"
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -74,8 +76,10 @@ export default function RootLayout({ children }) {
       </head>
       <body className={inter.className}>
         <AuthProviderClient>
-          <Header />
-          {children}
+          <YouTubeAuthProvider>
+            <Header />
+            {children}
+          </YouTubeAuthProvider>
         </AuthProviderClient>
         <BootstrapClient />
       </body>

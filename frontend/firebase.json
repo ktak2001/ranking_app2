@@ -7,12 +7,16 @@
       "**/node_modules/**"
     ],
     "frameworksBackend": {
-      "region": "asia-east1"
+      "region": "asia-east1",
+      "secretEnv": ["FB_PRIVATE_KEY"]
     },
     "environment": {
       "NEXT_PUBLIC_API_URL": "https://backend-io2redkura-an.a.run.app/api",
-      "NEXT_PUBLIC_WEB_URL": "https://virtual-youtuber-nagesen.com",
-      "NODE_ENV": "production"
+      "NEXT_PUBLIC_WEB_URL": "https://opensuperchat.com",
+      "WEB_BASE_URL": "https://opensuperchat.com",
+      "NODE_ENV": "production",
+      "FB_CLIENT_EMAIL": "firebase-adminsdk-vtb8n@ranking-app-bf2df.iam.gserviceaccount.com",
+      "FB_PROJECT_ID": "ranking-app-bf2df"
     }
   }
 }

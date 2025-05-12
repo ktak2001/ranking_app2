@@ -1,0 +1,8 @@
+/* styles/globals.css (または Header.module.css に追加) */
+:root { --header-height: 64px; }          /* 通常 1 行の場合 */
+@media (max-width: 576px) {               /* ボタンが 2 行に折り返す幅 */
+  :root { --header-height: 110px; }
+}
+
+body { padding-top: var(--header-height); }
+

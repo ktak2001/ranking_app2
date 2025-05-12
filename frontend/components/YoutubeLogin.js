@@ -10,7 +10,6 @@ export default function YoutubeLogin() {
     const utf8Array = utf8Encoder.encode(
       String.fromCharCode.apply(null, randomValues)
     );
-
     // Base64 encode the UTF-8 data
     return btoa(String.fromCharCode.apply(null, utf8Array))
       .replace(/\+/g, '-')

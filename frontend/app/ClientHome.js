@@ -58,7 +58,7 @@ export default function ClientHome({ initialYoutubers, initialSupporters }) {
 
   /* ─── 画面 ─── */
   return (
-    <div className="container-fluid pt-4">
+    <div className="container-fluid pt-3">
 
       {/* ==== フィルター ==== */}
       <TabNavigation

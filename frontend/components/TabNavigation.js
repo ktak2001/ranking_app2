@@ -18,7 +18,7 @@ export default function TabNavigation({
   setShowYear,
 }) {
   return (
-    <div className="d-flex flex-wrap align-items-center gap-2 m-5">
+    <div className="d-flex flex-wrap align-items-center gap-2 my-4 px-3">
 
       {/* === 期間トグル ============================== */}
       <div className="btn-group me-2">
