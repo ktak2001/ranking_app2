@@ -281,3 +281,22 @@ console.log("apps", admin.apps)
 youtubeログインボタンを押した後、youtube/callback/page.jsがapi/youtube/route.jsに委託してsupporterIdをdbにsetし、その後元のページ戻るような一連の流れになっているのかなと考えています。
 しかし戻った際、Header.jsはuseAuthで瞬時にuser情報を入手するのですが、おそらくその時supporterIdはまだないはずです。なので、無理やりHeader.jsがuseAuthによって入手するuserのsupporterIdに適切な値を入れ、youtubeLoginButtonをマイページボタンに変えたいのですがどうすればいいでしょう。
 また加えて、今は元のページに戻る仕様になっているのですが、そうではなくhref={`/supporters/${user.supporterId}`}に遷移するようにしてほしいです。お願いします。
+
+useAuthがリアルタイムで更新されるようになったら負担が相当重くなりませんか。
+リアルタイム性、このyoutube連携の時くらいですよ必要なの
+
+dbを見て、user.supporetrId != ""だったらrouter.replaceするものだと思うのですが、なぜその時Headerは再度新しくuseAuthを呼び出さないのでしょうか。
+
+>「リアルタイム監視＝常に重い」は誤解
+>しかも 今回の listener は supporterId が入った瞬間に unsub() して切断 します。
+
+・いえ、今回重くなるとはいってるのはyoutube/callbackにあるunsubではなく、useAuthの部分です。
+・あと、パターンBですが、どうそれをすればいいのでしょう。Header.jsにsetUserはありますが、supporterIdの情報を先に知るのはyoutube/callback/page.jsですよね。
+
+uCNiBJCk
+
+-----
+
+Case(1・2)で紹介されたヘッジファンド戦略（グローバルマルチ戦略）に関する具体的な情報、は添付したpdfにあります。その上でQ2に答えて
+
+また、添付資料を元にした授業について、簡単なコメント（質問・要望・感想含む）をコメントシート用に書いてほしい
